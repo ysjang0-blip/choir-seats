@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>찬양대 자리배치</title>
+<style>
+  body { font-family: "Malgun Gothic", sans-serif; margin: 0 auto; padding: 16px; max-width: 720px; background: #fafafa; }
+  h1 { font-size: 22px; text-align: center; }
+  .inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .inputs label { display: flex; flex-direction: column; font-size: 14px; gap: 4px; }
+  .inputs input { font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 8px; width: 100%; box-sizing: border-box; }
+  button { width: 100%; font-size: 18px; padding: 12px; border: 0; border-radius: 8px; background: #4E79A7; color: #fff; margin-bottom: 8px; cursor: pointer; }
+  button.secondary { background: #59A14F; }
+  #error { color: #c0392b; font-weight: bold; white-space: pre-line; margin: 8px 0; }
+  #chartWrap svg { width: 100%; height: auto; background: #fff; border: 1px solid #eee; border-radius: 8px; }
+  .note { font-size: 12px; color: #888; text-align: center; }
+</style>
+</head>
+<body>
+<h1>찬양대 자리배치</h1>
+<div class="inputs">
+  <label>소프라노 <input id="soprano" type="number" min="0" inputmode="numeric" placeholder="0"></label>
+  <label>알토 <input id="alto" type="number" min="0" inputmode="numeric" placeholder="0"></label>
+  <label>테너 <input id="tenor" type="number" min="0" inputmode="numeric" placeholder="0"></label>
+  <label>베이스 <input id="bass" type="number" min="0" inputmode="numeric" placeholder="0"></label>
+</div>
+<button id="assignBtn">배치하기</button>
+<button id="saveBtn" class="secondary" hidden>이미지로 저장</button>
+<div id="error"></div>
+<div id="chartWrap"></div>
+<p class="note">배치도는 지휘자가 찬양대를 바라본 방향 기준입니다.</p>
+<script src="assign.js"></script>
+<script>
+const COLORS = { soprano: "#E15759", alto: "#EDC948", bass: "#4E79A7", tenor: "#59A14F" };
+const NAMES = { soprano: "소프라노", alto: "알토", tenor: "테너", bass: "베이스" };
+const SEAT = 38, R = 15, BENCH_H = 46, ROW_GAP = 12, TOP = 20, PAD = 8;
+const LEFT_X = 20;                       // 왼쪽 블록 시작 x
+const RIGHT_CENTER = 759;                // 오른쪽 블록 중심 x
+
+function seatCircle(cx, cy, color) {
+  return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${color}" stroke="#00000022"/>`;
+}
+// 한 줄: 긴 의자이므로 앉은 사람 전체를 의자 폭에 골고루 펼친다.
+// 왼쪽부터 leftN명은 leftPart 색, 나머지는 rightPart 색.
+function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN) {
+  const w = cap * SEAT + PAD * 2;
+  let s = `<rect x="${x}" y="${y}" width="${w}" height="${BENCH_H}" rx="10" fill="#f5efe3" stroke="#c9bda5"/>`;
+  const total = leftN + rightN;
+  if (total > 0) {
+    const step = (w - PAD * 2) / total;
+    for (let k = 0; k < total; k++) {
+      const cx = x + PAD + (k + 0.5) * step, cy = y + BENCH_H / 2;
+      s += seatCircle(cx, cy, k < leftN ? COLORS[leftPart] : COLORS[rightPart]);
+    }
+  }
+  return s;
+}
+
+function renderChart(result) {
+  const counts = {
+    soprano: result.left.reduce((a, r) => a + r.soprano, 0),
+    alto: result.left.reduce((a, r) => a + r.alto, 0),
+    bass: result.right.reduce((a, r) => a + r.bass, 0),
+    tenor: result.right.reduce((a, r) => a + r.tenor, 0),
+  };
+  let s = `<svg id="chart" xmlns="http://www.w3.org/2000/svg" width="1000" height="400" viewBox="0 0 1000 400">`;
+  s += `<rect x="0" y="0" width="1000" height="400" fill="#ffffff"/>`;
+  s += `<text x="500" y="324" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#666">▼ 앞 (지휘자석) · 지휘자가 바라본 방향</text>`;
+  // 맨 앞줄(1줄)이 그림 아래쪽: 지휘자(맨 앞)가 바라본 모습 그대로
+  result.left.forEach((row, i) => {
+    const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
+    s += rowSvg(LEFT_X, y, row.capacity, "soprano", row.soprano, "alto", row.alto);
+  });
+  result.right.forEach((row, i) => {
+    const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
+    const w = row.capacity * SEAT + PAD * 2;
+    s += rowSvg(RIGHT_CENTER - w / 2, y, row.capacity, "bass", row.bass, "tenor", row.tenor);
+  });
+  const legendY = 362;
+  ["soprano", "alto", "bass", "tenor"].forEach((part, i) => {
+    const x = 40 + i * 240;
+    s += `<circle cx="${x}" cy="${legendY}" r="13" fill="${COLORS[part]}"/>`;
+    s += `<text x="${x + 22}" y="${legendY + 7}" font-family="sans-serif" font-size="22" fill="#333">${NAMES[part]} ${counts[part]}명</text>`;
+  });
+  return s + `</svg>`;
+}
+
+document.getElementById("assignBtn").addEventListener("click", () => {
+  const num = id => Number(document.getElementById(id).value || 0);
+  const result = assignSeats({ soprano: num("soprano"), alto: num("alto"), tenor: num("tenor"), bass: num("bass") });
+  const errorEl = document.getElementById("error");
+  const wrap = document.getElementById("chartWrap");
+  const saveBtn = document.getElementById("saveBtn");
+  if (!result.ok) {
+    errorEl.textContent = result.errors.join("\n");
+    wrap.innerHTML = "";
+    saveBtn.hidden = true;
+    return;
+  }
+  errorEl.textContent = "";
+  wrap.innerHTML = renderChart(result);
+  saveBtn.hidden = false;
+});
+
+function svgToPngDataUrl() {
+  return new Promise((resolve, reject) => {
+    const svg = document.getElementById("chart");
+    if (!svg) return reject(new Error("배치도가 없습니다"));
+    const xml = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const scale = 2; // 카톡 공유용 고해상도
+      const canvas = document.createElement("canvas");
+      canvas.width = 1000 * scale;
+      canvas.height = 400 * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("이미지 변환 실패")); };
+    img.src = url;
+  });
+}
+window.__testPng = svgToPngDataUrl;
+
+document.getElementById("saveBtn").addEventListener("click", async () => {
+  try {
+    const dataUrl = await svgToPngDataUrl();
+    const today = new Date().toISOString().slice(0, 10);
+    const a = document.createElement("a");
+    a.download = `자리배치_${today}.png`;
+    a.href = dataUrl;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (e) {
+    document.getElementById("error").textContent = "이미지 저장 중 문제가 생겼어요: " + e.message;
+  }
+});
+</script>
+</body>
+</html>
