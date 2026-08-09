@@ -10,8 +10,11 @@
   .inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .inputs label { display: flex; flex-direction: column; font-size: 14px; gap: 4px; }
   .inputs input { font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 8px; width: 100%; box-sizing: border-box; }
-  button { width: 100%; font-size: 18px; padding: 12px; border: 0; border-radius: 8px; background: #4E79A7; color: #fff; margin-bottom: 8px; cursor: pointer; }
-  button.secondary { background: #59A14F; }
+  button.action { width: 100%; font-size: 18px; padding: 12px; border: 0; border-radius: 8px; background: #4E79A7; color: #fff; margin-bottom: 8px; cursor: pointer; }
+  button.action.secondary { background: #59A14F; }
+  .stepper { display: flex; gap: 6px; }
+  .stepper input { flex: 1; min-width: 0; text-align: center; }
+  .stepper button { width: 52px; font-size: 26px; padding: 0; border: 1px solid #ccc; border-radius: 8px; background: #eee; color: #333; cursor: pointer; }
   #error { color: #c0392b; font-weight: bold; white-space: pre-line; margin: 8px 0; }
   #chartWrap svg { width: 100%; height: auto; background: #fff; border: 1px solid #eee; border-radius: 8px; }
   .note { font-size: 12px; color: #888; text-align: center; }
@@ -20,13 +23,37 @@
 <body>
 <h1>찬양대 자리배치</h1>
 <div class="inputs">
-  <label>소프라노 <input id="soprano" type="number" min="0" inputmode="numeric" placeholder="0"></label>
-  <label>알토 <input id="alto" type="number" min="0" inputmode="numeric" placeholder="0"></label>
-  <label>테너 <input id="tenor" type="number" min="0" inputmode="numeric" placeholder="0"></label>
-  <label>베이스 <input id="bass" type="number" min="0" inputmode="numeric" placeholder="0"></label>
+  <label>소프라노
+    <div class="stepper">
+      <button type="button" data-part="soprano" data-delta="-1">−</button>
+      <input id="soprano" type="number" min="0" inputmode="numeric" placeholder="0">
+      <button type="button" data-part="soprano" data-delta="1">+</button>
+    </div>
+  </label>
+  <label>알토
+    <div class="stepper">
+      <button type="button" data-part="alto" data-delta="-1">−</button>
+      <input id="alto" type="number" min="0" inputmode="numeric" placeholder="0">
+      <button type="button" data-part="alto" data-delta="1">+</button>
+    </div>
+  </label>
+  <label>테너
+    <div class="stepper">
+      <button type="button" data-part="tenor" data-delta="-1">−</button>
+      <input id="tenor" type="number" min="0" inputmode="numeric" placeholder="0">
+      <button type="button" data-part="tenor" data-delta="1">+</button>
+    </div>
+  </label>
+  <label>베이스
+    <div class="stepper">
+      <button type="button" data-part="bass" data-delta="-1">−</button>
+      <input id="bass" type="number" min="0" inputmode="numeric" placeholder="0">
+      <button type="button" data-part="bass" data-delta="1">+</button>
+    </div>
+  </label>
 </div>
-<button id="assignBtn">배치하기</button>
-<button id="saveBtn" class="secondary" hidden>이미지로 저장</button>
+<button id="assignBtn" class="action">배치하기</button>
+<button id="saveBtn" class="action secondary" hidden>이미지로 저장</button>
 <div id="error"></div>
 <div id="chartWrap"></div>
 <p class="note">배치도는 지휘자가 찬양대를 바라본 방향 기준입니다.</p>
@@ -36,31 +63,43 @@ const COLORS = { soprano: "#E15759", alto: "#EDC948", bass: "#4E79A7", tenor: "#
 const NAMES = { soprano: "소프라노", alto: "알토", tenor: "테너", bass: "베이스" };
 const NUM_COLORS = { soprano: "#E15759", alto: "#C9A227", bass: "#4E79A7", tenor: "#59A14F" };
 const SEAT = 38, R = 15, BENCH_H = 46, ROW_GAP = 12, TOP = 20, PAD = 8;
-const LEFT_X = 46;                       // 왼쪽 블록 시작 x (왼쪽에 인원 숫자 공간 확보)
-const RIGHT_CENTER = 770;                // 오른쪽 블록 중심 x
+const CHART_W = 1200, CHART_H = 400;     // 그림 전체 크기
+const LEFT_X = 90;                       // 왼쪽 블록 시작 x (왼쪽에 인원 숫자 공간 확보)
+const RIGHT_CENTER = 930;                // 오른쪽 블록 중심 x
+const NUM_SIZE = 60;                     // 의자 양옆 인원 숫자 크기 (칸 높이를 꽉 채움)
 
 function seatCircle(cx, cy, color) {
   return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${color}" stroke="#00000022"/>`;
 }
-// 한 줄: 긴 의자이므로 앉은 사람 전체를 의자 폭에 골고루 펼친다.
-// 왼쪽부터 leftN명은 leftPart 색, 나머지는 rightPart 색.
-// rowIndex 홀짝에 따라 반 칸씩 엇갈리게(지그재그) 놓아 앞줄과 겹치지 않게 한다.
+// 한 줄: 왼쪽부터 leftN명은 leftPart 색, 나머지는 rightPart 색.
+// 지그재그일 때 1·3·5번째 줄은 의자 양 끝(최외곽)까지 펼치고,
+// 2·4번째 줄은 반 칸 안쪽으로 들여 앞줄과 엇갈리게 한다.
+// 지그재그가 아니면 모든 줄을 똑같이 골고루 펼친다.
 // 의자 양옆에는 그 줄에 앉는 파트별 인원 수를 표시한다.
-function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex) {
+function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag) {
   const w = cap * SEAT + PAD * 2;
   let s = `<rect x="${x}" y="${y}" width="${w}" height="${BENCH_H}" rx="10" fill="#f5efe3" stroke="#c9bda5"/>`;
   const total = leftN + rightN;
   if (total > 0) {
-    const step = (w - PAD * 2) / total;
-    const phase = rowIndex % 2 === 0 ? -0.25 : 0.25;
-    for (let k = 0; k < total; k++) {
-      const cx = x + PAD + (k + 0.5 + phase) * step, cy = y + BENCH_H / 2;
-      s += seatCircle(cx, cy, k < leftN ? COLORS[leftPart] : COLORS[rightPart]);
+    const cy = y + BENCH_H / 2;
+    const xs = [];
+    if (total === 1) {
+      xs.push(x + w / 2);
+    } else if (zigzag) {
+      const inner = w - PAD * 2 - R * 2;               // 첫 원 중심~끝 원 중심 최대 폭
+      const gap = inner / (total - 1);
+      const inset = rowIndex % 2 === 0 ? 0 : gap / 2;  // 1·3·5줄은 끝까지, 2·4줄은 반 칸 안쪽
+      const span = inner - inset * 2;
+      for (let k = 0; k < total; k++) xs.push(x + PAD + R + inset + (k * span) / (total - 1));
+    } else {
+      const step = (w - PAD * 2) / total;
+      for (let k = 0; k < total; k++) xs.push(x + PAD + (k + 0.5) * step);
     }
+    xs.forEach((cx, k) => { s += seatCircle(cx, cy, k < leftN ? COLORS[leftPart] : COLORS[rightPart]); });
   }
-  const ty = y + BENCH_H / 2 + 7;
-  if (leftN > 0) s += `<text x="${x - 8}" y="${ty}" text-anchor="end" font-family="sans-serif" font-size="20" font-weight="bold" fill="${NUM_COLORS[leftPart]}">${leftN}</text>`;
-  if (rightN > 0) s += `<text x="${x + w + 8}" y="${ty}" text-anchor="start" font-family="sans-serif" font-size="20" font-weight="bold" fill="${NUM_COLORS[rightPart]}">${rightN}</text>`;
+  const ty = y + BENCH_H / 2 + NUM_SIZE * 0.35;
+  if (leftN > 0) s += `<text x="${x - 10}" y="${ty}" text-anchor="end" font-family="sans-serif" font-size="${NUM_SIZE}" font-weight="bold" fill="${NUM_COLORS[leftPart]}">${leftN}</text>`;
+  if (rightN > 0) s += `<text x="${x + w + 10}" y="${ty}" text-anchor="start" font-family="sans-serif" font-size="${NUM_SIZE}" font-weight="bold" fill="${NUM_COLORS[rightPart]}">${rightN}</text>`;
   return s;
 }
 
@@ -71,29 +110,31 @@ function renderChart(result) {
     bass: result.right.reduce((a, r) => a + r.bass, 0),
     tenor: result.right.reduce((a, r) => a + r.tenor, 0),
   };
-  let s = `<svg id="chart" xmlns="http://www.w3.org/2000/svg" width="1000" height="400" viewBox="0 0 1000 400">`;
-  s += `<rect x="0" y="0" width="1000" height="400" fill="#ffffff"/>`;
-  s += `<text x="500" y="324" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#666">▼ 앞 (지휘자석) · 지휘자가 바라본 방향</text>`;
+  // 소프라노+알토 합이 50명을 넘으면 왼쪽 블록은 지그재그 없이 똑바로 줄을 선다.
+  const leftZigzag = counts.soprano + counts.alto <= 50;
+  let s = `<svg id="chart" xmlns="http://www.w3.org/2000/svg" width="${CHART_W}" height="${CHART_H}" viewBox="0 0 ${CHART_W} ${CHART_H}">`;
+  s += `<rect x="0" y="0" width="${CHART_W}" height="${CHART_H}" fill="#ffffff"/>`;
+  s += `<text x="${CHART_W / 2}" y="324" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#666">▼ 앞 (지휘자석) · 지휘자가 바라본 방향</text>`;
   // 맨 앞줄(1줄)이 그림 아래쪽: 지휘자(맨 앞)가 바라본 모습 그대로
   result.left.forEach((row, i) => {
     const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
-    s += rowSvg(LEFT_X, y, row.capacity, "soprano", row.soprano, "alto", row.alto, i);
+    s += rowSvg(LEFT_X, y, row.capacity, "soprano", row.soprano, "alto", row.alto, i, leftZigzag);
   });
   result.right.forEach((row, i) => {
     const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
     const w = row.capacity * SEAT + PAD * 2;
-    s += rowSvg(RIGHT_CENTER - w / 2, y, row.capacity, "bass", row.bass, "tenor", row.tenor, i);
+    s += rowSvg(RIGHT_CENTER - w / 2, y, row.capacity, "bass", row.bass, "tenor", row.tenor, i, true);
   });
   const legendY = 362;
   ["soprano", "alto", "bass", "tenor"].forEach((part, i) => {
-    const x = 40 + i * 240;
+    const x = 60 + i * 280;
     s += `<circle cx="${x}" cy="${legendY}" r="13" fill="${COLORS[part]}"/>`;
     s += `<text x="${x + 22}" y="${legendY + 7}" font-family="sans-serif" font-size="22" fill="#333">${NAMES[part]} ${counts[part]}명</text>`;
   });
   return s + `</svg>`;
 }
 
-document.getElementById("assignBtn").addEventListener("click", () => {
+function runAssign() {
   const num = id => Number(document.getElementById(id).value || 0);
   const result = assignSeats({ soprano: num("soprano"), alto: num("alto"), tenor: num("tenor"), bass: num("bass") });
   const errorEl = document.getElementById("error");
@@ -108,6 +149,16 @@ document.getElementById("assignBtn").addEventListener("click", () => {
   errorEl.textContent = "";
   wrap.innerHTML = renderChart(result);
   saveBtn.hidden = false;
+}
+document.getElementById("assignBtn").addEventListener("click", runAssign);
+
+// +/- 버튼: 한 번 누르면 인원 변경과 배치도 갱신이 동시에 된다.
+document.querySelectorAll(".stepper button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const input = document.getElementById(btn.dataset.part);
+    input.value = Math.max(0, (Number(input.value) || 0) + Number(btn.dataset.delta));
+    runAssign();
+  });
 });
 
 function svgToPngDataUrl() {
@@ -121,8 +172,8 @@ function svgToPngDataUrl() {
     img.onload = () => {
       const scale = 2; // 카톡 공유용 고해상도
       const canvas = document.createElement("canvas");
-      canvas.width = 1000 * scale;
-      canvas.height = 400 * scale;
+      canvas.width = CHART_W * scale;
+      canvas.height = CHART_H * scale;
       const ctx = canvas.getContext("2d");
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
