@@ -2,17 +2,24 @@
 const LEFT_CAPS = [12, 12, 12, 12, 12]; // 왼쪽 블록: 소프라노(왼쪽)·알토(오른쪽)
 const RIGHT_CAPS = [8, 10, 12, 14];     // 오른쪽 블록: 베이스(왼쪽)·테너(오른쪽), 뒤로 갈수록 넓어지는 사다리꼴
 
-// count명을 줄 좌석 수(capacities)에 비례해 배분한다.
-// 나머지는 소수점이 큰 줄부터(동률이면 앞줄부터) 1명씩 추가.
+// count명을 모든 줄에 최대한 균등하게 나눈다. 나머지는 앞줄부터 1명씩 추가.
+// 좌석 수가 작은 줄이 정원을 넘으면 여유가 가장 큰 줄로 넘긴다.
 function distributeToRows(count, capacities) {
-  const total = capacities.reduce((a, b) => a + b, 0);
-  const ideal = capacities.map(c => (count * c) / total);
-  const rows = ideal.map(Math.floor);
-  const remainder = count - rows.reduce((a, b) => a + b, 0);
-  const order = ideal
-    .map((v, i) => ({ frac: v - Math.floor(v), i }))
-    .sort((a, b) => b.frac - a.frac || a.i - b.i);
-  for (let k = 0; k < remainder; k++) rows[order[k].i] += 1;
+  const n = capacities.length;
+  const base = Math.floor(count / n), rem = count % n;
+  const rows = capacities.map((c, i) => base + (i < rem ? 1 : 0));
+  let guard = 200;
+  while (guard-- > 0) {
+    const over = rows.findIndex((v, i) => v > capacities[i]);
+    if (over === -1) break;
+    let best = -1, bestFree = 0;
+    capacities.forEach((c, i) => {
+      const free = c - rows[i];
+      if (free > bestFree) { bestFree = free; best = i; }
+    });
+    if (best === -1) break; // 전체 정원 초과 — assignSeats에서 미리 걸러짐
+    rows[over]--; rows[best]++;
+  }
   return rows;
 }
 
