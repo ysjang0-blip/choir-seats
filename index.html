@@ -63,9 +63,9 @@ const COLORS = { soprano: "#E15759", alto: "#EDC948", bass: "#4E79A7", tenor: "#
 const NAMES = { soprano: "소프라노", alto: "알토", tenor: "테너", bass: "베이스" };
 const NUM_COLORS = { soprano: "#E15759", alto: "#C9A227", bass: "#4E79A7", tenor: "#59A14F" };
 const SEAT = 38, R = 15, BENCH_H = 46, ROW_GAP = 12, TOP = 20, PAD = 8;
-const CHART_W = 1200, CHART_H = 400;     // 그림 전체 크기
+const CHART_W = 1370, CHART_H = 400;     // 그림 전체 크기
 const LEFT_X = 90;                       // 왼쪽 블록 시작 x (왼쪽에 인원 숫자 공간 확보)
-const RIGHT_CENTER = 930;                // 오른쪽 블록 중심 x
+const RIGHT_EDGE = 1280;                 // 오른쪽 블록의 오른쪽 끝 x (90도 수직 변 — 사다리꼴의 직각 쪽)
 const NUM_SIZE = 60;                     // 의자 양옆 인원 숫자 크기 (칸 높이를 꽉 채움)
 
 function seatCircle(cx, cy, color) {
@@ -132,10 +132,11 @@ function renderChart(result) {
     const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
     s += rowSvg(LEFT_X, y, row.capacity, "soprano", row.soprano, "alto", row.alto, i, leftZigzag, "right", leftGap);
   });
+  // 오른쪽 블록: 오른쪽 끝을 수직으로 맞추고(90도), 의자가 뒤로 갈수록 길어져 왼쪽이 사선인 사다리꼴
   result.right.forEach((row, i) => {
     const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
     const w = row.capacity * SEAT + PAD * 2;
-    s += rowSvg(RIGHT_CENTER - w / 2, y, row.capacity, "bass", row.bass, "tenor", row.tenor, i, true, "left", rightGap);
+    s += rowSvg(RIGHT_EDGE - w, y, row.capacity, "bass", row.bass, "tenor", row.tenor, i, true, "left", rightGap);
   });
   const legendY = 362;
   ["soprano", "alto", "bass", "tenor"].forEach((part, i) => {
