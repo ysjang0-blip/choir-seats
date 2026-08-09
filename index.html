@@ -34,26 +34,33 @@
 <script>
 const COLORS = { soprano: "#E15759", alto: "#EDC948", bass: "#4E79A7", tenor: "#59A14F" };
 const NAMES = { soprano: "소프라노", alto: "알토", tenor: "테너", bass: "베이스" };
+const NUM_COLORS = { soprano: "#E15759", alto: "#C9A227", bass: "#4E79A7", tenor: "#59A14F" };
 const SEAT = 38, R = 15, BENCH_H = 46, ROW_GAP = 12, TOP = 20, PAD = 8;
-const LEFT_X = 20;                       // 왼쪽 블록 시작 x
-const RIGHT_CENTER = 759;                // 오른쪽 블록 중심 x
+const LEFT_X = 46;                       // 왼쪽 블록 시작 x (왼쪽에 인원 숫자 공간 확보)
+const RIGHT_CENTER = 770;                // 오른쪽 블록 중심 x
 
 function seatCircle(cx, cy, color) {
   return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${color}" stroke="#00000022"/>`;
 }
 // 한 줄: 긴 의자이므로 앉은 사람 전체를 의자 폭에 골고루 펼친다.
 // 왼쪽부터 leftN명은 leftPart 색, 나머지는 rightPart 색.
-function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN) {
+// rowIndex 홀짝에 따라 반 칸씩 엇갈리게(지그재그) 놓아 앞줄과 겹치지 않게 한다.
+// 의자 양옆에는 그 줄에 앉는 파트별 인원 수를 표시한다.
+function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex) {
   const w = cap * SEAT + PAD * 2;
   let s = `<rect x="${x}" y="${y}" width="${w}" height="${BENCH_H}" rx="10" fill="#f5efe3" stroke="#c9bda5"/>`;
   const total = leftN + rightN;
   if (total > 0) {
     const step = (w - PAD * 2) / total;
+    const phase = rowIndex % 2 === 0 ? -0.25 : 0.25;
     for (let k = 0; k < total; k++) {
-      const cx = x + PAD + (k + 0.5) * step, cy = y + BENCH_H / 2;
+      const cx = x + PAD + (k + 0.5 + phase) * step, cy = y + BENCH_H / 2;
       s += seatCircle(cx, cy, k < leftN ? COLORS[leftPart] : COLORS[rightPart]);
     }
   }
+  const ty = y + BENCH_H / 2 + 7;
+  if (leftN > 0) s += `<text x="${x - 8}" y="${ty}" text-anchor="end" font-family="sans-serif" font-size="20" font-weight="bold" fill="${NUM_COLORS[leftPart]}">${leftN}</text>`;
+  if (rightN > 0) s += `<text x="${x + w + 8}" y="${ty}" text-anchor="start" font-family="sans-serif" font-size="20" font-weight="bold" fill="${NUM_COLORS[rightPart]}">${rightN}</text>`;
   return s;
 }
 
@@ -70,12 +77,12 @@ function renderChart(result) {
   // 맨 앞줄(1줄)이 그림 아래쪽: 지휘자(맨 앞)가 바라본 모습 그대로
   result.left.forEach((row, i) => {
     const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
-    s += rowSvg(LEFT_X, y, row.capacity, "soprano", row.soprano, "alto", row.alto);
+    s += rowSvg(LEFT_X, y, row.capacity, "soprano", row.soprano, "alto", row.alto, i);
   });
   result.right.forEach((row, i) => {
     const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
     const w = row.capacity * SEAT + PAD * 2;
-    s += rowSvg(RIGHT_CENTER - w / 2, y, row.capacity, "bass", row.bass, "tenor", row.tenor);
+    s += rowSvg(RIGHT_CENTER - w / 2, y, row.capacity, "bass", row.bass, "tenor", row.tenor, i);
   });
   const legendY = 362;
   ["soprano", "alto", "bass", "tenor"].forEach((part, i) => {
