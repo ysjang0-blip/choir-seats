@@ -66,7 +66,6 @@ const SEAT = 38, R = 15, BENCH_H = 46, ROW_GAP = 12, TOP = 20, PAD = 8;
 const CHART_W = 1370, CHART_H = 400;     // 그림 전체 크기
 const LEFT_X = 90;                       // 왼쪽 블록 시작 x (왼쪽에 인원 숫자 공간 확보)
 const RIGHT_EDGE = 1280;                 // 오른쪽 블록의 오른쪽 끝 x (90도 수직 변 — 사다리꼴의 직각 쪽)
-const MAX_GAP = SEAT * 1.5;              // 사람 사이 최대 간격 — 한 명 이상 들어갈 빈틈이 생기지 않게
 const NUM_SIZE = 60;                     // 의자 양옆 인원 숫자 크기 (칸 높이를 꽉 채움)
 
 function seatCircle(cx, cy, color) {
@@ -119,12 +118,13 @@ function renderChart(result) {
   };
   // 소프라노+알토 합이 50명부터는 왼쪽 블록은 지그재그 없이 똑바로 줄을 선다.
   const leftZigzag = counts.soprano + counts.alto < 50;
-  // 블록 공통 지그재그 간격: 가장 빽빽한 줄도 반 칸 물러난 채 의자에 들어가는 최소 간격.
-  // 단 MAX_GAP을 넘지 않게 해서 사람 사이에 한 명 이상 들어갈 빈틈이 안 생기게 한다.
+  // 블록 공통 지그재그 간격: 각 줄이 의자를 최대한 채우도록 간격을 벌리되,
+  // 가장 빽빽한 줄도 반 칸 물러난 채 의자를 벗어나지 않는 값(줄별 최소치)을 쓴다.
+  // 줄별 인원이 좌석 수에 비례하므로 이 간격으로 모든 줄이 의자를 거의 채운다.
   const gapOf = rows => {
     const cands = rows.filter(r => r.total > 0)
-      .map(r => (r.cap * SEAT - R * 2) / Math.max(r.total - 0.5, 0.5));
-    return cands.length ? Math.min(Math.min(...cands), MAX_GAP) : 0;
+      .map(r => (r.cap * SEAT - R * 2) / Math.max(r.total - 0.5, 1.5));
+    return cands.length ? Math.min(...cands) : 0;
   };
   const leftGap = gapOf(result.left.map(r => ({ cap: r.capacity, total: r.soprano + r.alto })));
   const rightGap = gapOf(result.right.map(r => ({ cap: r.capacity, total: r.bass + r.tenor })));
