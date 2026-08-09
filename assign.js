@@ -23,21 +23,31 @@ function distributeToRows(count, capacities) {
   return rows;
 }
 
-// 한 줄에 두 파트 합이 정원을 넘으면, 여유가 가장 큰 줄로 한 명씩 옮긴다.
+// 두 파트를 합친 줄별 목표 인원: 줄 좌석 수에 비례해 나눈다.
+// 나머지는 소수점이 큰 줄부터(동률이면 앞줄부터) 1명씩 추가.
+function proportionalTargets(count, capacities) {
+  const total = capacities.reduce((a, b) => a + b, 0);
+  const ideal = capacities.map(c => (count * c) / total);
+  const rows = ideal.map(Math.floor);
+  const remainder = count - rows.reduce((a, b) => a + b, 0);
+  const order = ideal
+    .map((v, i) => ({ frac: v - Math.floor(v), i }))
+    .sort((a, b) => b.frac - a.frac || a.i - b.i);
+  for (let k = 0; k < remainder; k++) rows[order[k].i] += 1;
+  return rows;
+}
+
+// 두 파트(a, b)의 줄별 합계를 목표(targets)에 맞춘다.
+// 합계가 넘치는 줄에서 모자란 줄로 1명씩 옮기되,
 // 그 줄에 더 많이 앉은 파트(동률이면 a)에서 옮긴다. a, b를 직접 수정한다.
-function rebalance(a, b, capacities) {
-  let guard = 200;
+function balanceToTargets(a, b, targets) {
+  let guard = 500;
   while (guard-- > 0) {
-    const over = capacities.findIndex((c, i) => a[i] + b[i] > c);
-    if (over === -1) return;
-    let best = -1, bestFree = 0;
-    capacities.forEach((c, i) => {
-      const free = c - a[i] - b[i];
-      if (free > bestFree) { bestFree = free; best = i; }
-    });
-    if (best === -1) return; // 전체 정원 초과 — assignSeats에서 미리 걸러짐
-    if (a[over] >= b[over]) { a[over]--; a[best]++; }
-    else { b[over]--; b[best]++; }
+    const over = targets.findIndex((t, i) => a[i] + b[i] > t);
+    const under = targets.findIndex((t, i) => a[i] + b[i] < t);
+    if (over === -1 || under === -1) return;
+    if (a[over] >= b[over]) { a[over]--; a[under]++; }
+    else { b[over]--; b[under]++; }
   }
 }
 
@@ -64,10 +74,10 @@ function assignSeats(counts) {
 
   const sop = distributeToRows(counts.soprano, LEFT_CAPS);
   const alto = distributeToRows(counts.alto, LEFT_CAPS);
-  rebalance(sop, alto, LEFT_CAPS);
+  balanceToTargets(sop, alto, proportionalTargets(counts.soprano + counts.alto, LEFT_CAPS));
   const bass = distributeToRows(counts.bass, RIGHT_CAPS);
   const tenor = distributeToRows(counts.tenor, RIGHT_CAPS);
-  rebalance(bass, tenor, RIGHT_CAPS);
+  balanceToTargets(bass, tenor, proportionalTargets(counts.bass + counts.tenor, RIGHT_CAPS));
 
   return {
     ok: true,
@@ -77,5 +87,5 @@ function assignSeats(counts) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { LEFT_CAPS, RIGHT_CAPS, distributeToRows, rebalance, assignSeats };
+  module.exports = { LEFT_CAPS, RIGHT_CAPS, distributeToRows, proportionalTargets, balanceToTargets, assignSeats };
 }
