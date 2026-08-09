@@ -23,17 +23,27 @@ function distributeToRows(count, capacities) {
   return rows;
 }
 
-// 두 파트를 합친 줄별 목표 인원: 줄 좌석 수에 비례해 나눈다.
-// 나머지는 소수점이 큰 줄부터(동률이면 앞줄부터) 1명씩 추가.
-function proportionalTargets(count, capacities) {
-  const total = capacities.reduce((a, b) => a + b, 0);
-  const ideal = capacities.map(c => (count * c) / total);
-  const rows = ideal.map(Math.floor);
-  const remainder = count - rows.reduce((a, b) => a + b, 0);
-  const order = ideal
-    .map((v, i) => ({ frac: v - Math.floor(v), i }))
-    .sort((a, b) => b.frac - a.frac || a.i - b.i);
-  for (let k = 0; k < remainder; k++) rows[order[k].i] += 1;
+// 그림과 같은 비율로 줄의 폭 부담을 계산하기 위한 상수 (index.html의 SEAT, R과 동일)
+const SEAT_W = 38, PERSON_R = 15;
+
+// 두 파트를 합친 줄별 목표 인원.
+// 지그재그에서 줄이 차지하는 폭은 (인원-1)칸(끝에 바짝 붙는 줄) 또는
+// (인원-0.5)칸(반 칸 물러나는 줄)이다. 한 명씩, 추가해도 폭 부담(필요 폭/의자 폭)이
+// 가장 작은 줄에 넣는다(동률이면 앞줄부터). 그래야 간격을 최대한 벌려 의자를 채울 수 있다.
+// flushParity: 끝에 바짝 붙는 줄의 홀짝 (왼쪽 블록 0 = 1·3·5줄, 오른쪽 블록 1 = 2·4줄)
+function fillTargets(count, capacities, flushParity) {
+  const inner = capacities.map(c => c * SEAT_W - PERSON_R * 2);
+  const rows = capacities.map(() => 0);
+  for (let k = 0; k < count; k++) {
+    let best = -1, bestLoad = Infinity;
+    capacities.forEach((cap, i) => {
+      if (rows[i] >= cap) return;
+      const d = rows[i] + 1 - (i % 2 === flushParity ? 1 : 0.5);
+      const load = d / inner[i];
+      if (load < bestLoad - 1e-9) { bestLoad = load; best = i; }
+    });
+    rows[best]++;
+  }
   return rows;
 }
 
@@ -74,10 +84,10 @@ function assignSeats(counts) {
 
   const sop = distributeToRows(counts.soprano, LEFT_CAPS);
   const alto = distributeToRows(counts.alto, LEFT_CAPS);
-  balanceToTargets(sop, alto, proportionalTargets(counts.soprano + counts.alto, LEFT_CAPS));
+  balanceToTargets(sop, alto, fillTargets(counts.soprano + counts.alto, LEFT_CAPS, 0));
   const bass = distributeToRows(counts.bass, RIGHT_CAPS);
   const tenor = distributeToRows(counts.tenor, RIGHT_CAPS);
-  balanceToTargets(bass, tenor, proportionalTargets(counts.bass + counts.tenor, RIGHT_CAPS));
+  balanceToTargets(bass, tenor, fillTargets(counts.bass + counts.tenor, RIGHT_CAPS, 1));
 
   return {
     ok: true,
@@ -87,5 +97,5 @@ function assignSeats(counts) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { LEFT_CAPS, RIGHT_CAPS, distributeToRows, proportionalTargets, balanceToTargets, assignSeats };
+  module.exports = { LEFT_CAPS, RIGHT_CAPS, distributeToRows, fillTargets, balanceToTargets, assignSeats };
 }

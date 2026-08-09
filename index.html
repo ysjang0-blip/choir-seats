@@ -119,15 +119,15 @@ function renderChart(result) {
   // 소프라노+알토 합이 50명부터는 왼쪽 블록은 지그재그 없이 똑바로 줄을 선다.
   const leftZigzag = counts.soprano + counts.alto < 50;
   // 블록 공통 지그재그 간격: 각 줄이 의자를 최대한 채우도록 간격을 벌리되,
-  // 가장 빽빽한 줄도 반 칸 물러난 채 의자를 벗어나지 않는 값(줄별 최소치)을 쓴다.
-  // 줄별 인원이 좌석 수에 비례하므로 이 간격으로 모든 줄이 의자를 거의 채운다.
-  const gapOf = rows => {
+  // 어떤 줄도 의자를 벗어나지 않는 값(줄별 최소치)을 쓴다.
+  // 끝에 바짝 붙는 줄은 (인원-1)칸, 반 칸 물러나는 줄은 (인원-0.5)칸을 차지한다.
+  const gapOf = (rows, flushParity) => {
     const cands = rows.filter(r => r.total > 0)
-      .map(r => (r.cap * SEAT - R * 2) / Math.max(r.total - 0.5, 1.5));
+      .map(r => (r.cap * SEAT - R * 2) / Math.max(r.total - (r.i % 2 === flushParity ? 1 : 0.5), 1.5));
     return cands.length ? Math.min(...cands) : 0;
   };
-  const leftGap = gapOf(result.left.map(r => ({ cap: r.capacity, total: r.soprano + r.alto })));
-  const rightGap = gapOf(result.right.map(r => ({ cap: r.capacity, total: r.bass + r.tenor })));
+  const leftGap = gapOf(result.left.map((r, i) => ({ cap: r.capacity, total: r.soprano + r.alto, i })), 0);
+  const rightGap = gapOf(result.right.map((r, i) => ({ cap: r.capacity, total: r.bass + r.tenor, i })), 1);
   let s = `<svg id="chart" xmlns="http://www.w3.org/2000/svg" width="${CHART_W}" height="${CHART_H}" viewBox="0 0 ${CHART_W} ${CHART_H}">`;
   s += `<rect x="0" y="0" width="${CHART_W}" height="${CHART_H}" fill="#ffffff"/>`;
   s += `<text x="${CHART_W / 2}" y="324" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#666">▼ 앞 (지휘자석) · 지휘자가 바라본 방향</text>`;
