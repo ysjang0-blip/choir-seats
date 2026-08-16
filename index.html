@@ -63,11 +63,11 @@ const COLORS = { soprano: "#E15759", alto: "#EDC948", bass: "#4E79A7", tenor: "#
 const NAMES = { soprano: "소프라노", alto: "알토", tenor: "테너", bass: "베이스" };
 const NUM_COLORS = { soprano: "#E15759", alto: "#C9A227", bass: "#4E79A7", tenor: "#59A14F" };
 const SEAT = 38, R = 15, BENCH_H = 46, TOP = 20, PAD = 8;
-const ROW_GAP = 12 + BENCH_H;            // 앞뒤 줄 간격: 의자 한 줄이 더 들어갈 만큼 벌린다(그 공간에 인원 숫자를 쓴다)
-const CHART_W = 1370, CHART_H = 640;     // 그림 전체 크기
+const ROW_GAP = 80;                      // 앞뒤 줄 간격: 의자 한 줄(46)보다 넉넉히 벌린다(그 공간에 인원 숫자를 쓴다)
+const CHART_W = 1370, CHART_H = 750;     // 그림 전체 크기
 const LEFT_X = 90;                       // 왼쪽 블록 시작 x
 const RIGHT_EDGE = 1280;                 // 오른쪽 블록의 오른쪽 끝 x (90도 수직 변 — 사다리꼴의 직각 쪽)
-const NUM_SIZE = 46;                     // 인원 숫자 크기 (벌려 놓은 앞뒤 공간을 꽉 채움)
+const NUM_SIZE = 92;                     // 인원 숫자 크기 (벌려 놓은 앞뒤 공간을 꽉 채움)
 
 function seatCircle(cx, cy, color) {
   return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${color}" stroke="#00000022"/>`;
@@ -117,10 +117,10 @@ function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag,
     if (leftBlock) {
       const sp = sopranoSplit(leftN, rightN);
       s += num(xs[total - 1] + R, "end", rightPart, rightN);      // 알토: 맨 오른쪽 끝 아래
-      if (leftN > 0) {
-        s += num(xs[leftN - 1] + R, "end", leftPart, sp.right);   // 소프라노 자리의 오른쪽 아래
-        s += num(xs[0] - R, "start", leftPart, sp.left);          // 소프라노 자리의 왼쪽 아래
-      }
+      // 소프라노 두 숫자는 각각 해당 인원들의 한가운데 아래에 둔다(숫자끼리 겹치지 않게).
+      const mid = (from, cnt) => (xs[from] + xs[from + cnt - 1]) / 2;
+      if (sp.right > 0) s += num(mid(sp.left, sp.right), "middle", leftPart, sp.right);
+      if (sp.left > 0) s += num(mid(0, sp.left), "middle", leftPart, sp.left);
     } else {
       s += num(xs[total - 1] + R, "end", rightPart, rightN);      // 테너: 오른쪽 끝 아래
       s += num(xs[0] - R, "start", leftPart, leftN);              // 베이스: 왼쪽 끝 아래
@@ -157,7 +157,7 @@ function renderChart(result) {
   const rightGap = gapOf(result.right.map((r, i) => ({ cap: r.capacity, total: r.bass + r.tenor, i })), 1);
   let s = `<svg id="chart" xmlns="http://www.w3.org/2000/svg" width="${CHART_W}" height="${CHART_H}" viewBox="0 0 ${CHART_W} ${CHART_H}">`;
   s += `<rect x="0" y="0" width="${CHART_W}" height="${CHART_H}" fill="#ffffff"/>`;
-  s += `<text x="${CHART_W / 2}" y="572" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#666">▼ 앞 (지휘자석) · 지휘자가 바라본 방향</text>`;
+  s += `<text x="${CHART_W / 2}" y="682" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#666">▼ 앞 (지휘자석) · 지휘자가 바라본 방향</text>`;
   // 맨 앞줄(1줄)이 그림 아래쪽: 지휘자(맨 앞)가 바라본 모습 그대로
   result.left.forEach((row, i) => {
     const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
@@ -170,7 +170,7 @@ function renderChart(result) {
     const w = row.capacity * SEAT + PAD * 2;
     s += rowSvg(RIGHT_EDGE - w, y, row.capacity, "bass", row.bass, "tenor", row.tenor, i, true, "right", rightGap, 1, false);
   });
-  const legendY = 610;
+  const legendY = 720;
   ["soprano", "alto", "bass", "tenor"].forEach((part, i) => {
     const x = 60 + i * 280;
     s += `<circle cx="${x}" cy="${legendY}" r="13" fill="${COLORS[part]}"/>`;
