@@ -116,11 +116,14 @@ function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag,
       : "";
     if (leftBlock) {
       const sp = sopranoSplit(leftN, rightN);
-      s += num(xs[total - 1] + R, "end", rightPart, rightN);      // 알토: 맨 오른쪽 끝 아래
-      // 소프라노 두 숫자는 각각 해당 인원들의 한가운데 아래에 둔다(숫자끼리 겹치지 않게).
-      const mid = (from, cnt) => (xs[from] + xs[from + cnt - 1]) / 2;
-      if (sp.right > 0) s += num(mid(sp.left, sp.right), "middle", leftPart, sp.right);
-      if (sp.left > 0) s += num(mid(0, sp.left), "middle", leftPart, sp.left);
+      // 알토와 소프라노 왼쪽 숫자는 사람 끝이 아니라 의자(좌석) 끝에 맞춘다.
+      s += num(x + w - PAD, "end", rightPart, rightN);            // 알토: 좌석 오른쪽 끝 아래
+      s += num(x + PAD, "start", leftPart, sp.left);              // 소프라노: 좌석 왼쪽 끝 아래
+      // 알토 자리로 넘어온 소프라노만 그 인원들의 한가운데 아래에 둔다.
+      if (sp.right > 0) {
+        const from = sp.left;
+        s += num((xs[from] + xs[from + sp.right - 1]) / 2, "middle", leftPart, sp.right);
+      }
     } else {
       s += num(xs[total - 1] + R, "end", rightPart, rightN);      // 테너: 오른쪽 끝 아래
       s += num(xs[0] - R, "start", leftPart, leftN);              // 베이스: 왼쪽 끝 아래
