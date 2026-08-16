@@ -61,6 +61,16 @@ function balanceToTargets(a, b, targets) {
   }
 }
 
+// 왼쪽 줄의 소프라노 인원을 두 덩이로 나눈다.
+// 한 줄의 오른쪽 5자리는 알토 자리이므로, 알토가 5명보다 적으면
+// 남는 알토 자리에 소프라노가 (5 - 알토)명 앉는다(right).
+// 나머지 소프라노(left)는 원래 소프라노 자리에 앉는다.
+// 알토가 5명 이상이면 넘어가는 소프라노는 없다(right = 0).
+function sopranoSplit(soprano, alto) {
+  const right = Math.max(0, Math.min(soprano, 5 - alto));
+  return { left: soprano - right, right };
+}
+
 function assignSeats(counts) {
   const errors = [];
   const names = { soprano: "소프라노", alto: "알토", tenor: "테너", bass: "베이스" };
@@ -97,5 +107,5 @@ function assignSeats(counts) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { LEFT_CAPS, RIGHT_CAPS, distributeToRows, fillTargets, balanceToTargets, assignSeats };
+  module.exports = { LEFT_CAPS, RIGHT_CAPS, distributeToRows, fillTargets, balanceToTargets, sopranoSplit, assignSeats };
 }
