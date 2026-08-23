@@ -166,7 +166,7 @@ function renderChart(result) {
   const rightGap = gapOf(result.right.map((r, i) => ({ cap: r.capacity, total: r.bass + r.tenor, i })), 1);
   let s = `<svg id="chart" xmlns="http://www.w3.org/2000/svg" width="${CHART_W}" height="${CHART_H}" viewBox="0 0 ${CHART_W} ${CHART_H}">`;
   s += `<rect x="0" y="0" width="${CHART_W}" height="${CHART_H}" fill="#ffffff"/>`;
-  s += `<text x="${CHART_W / 2}" y="705" text-anchor="middle" font-family="sans-serif" font-size="${LABEL_SIZE}" fill="#666">▼ 앞 (지휘자석) · 지휘자가 바라본 방향</text>`;
+  s += `<text x="${CHART_W / 2}" y="705" text-anchor="middle" font-family="sans-serif" font-size="${LABEL_SIZE}" fill="#666">▲ 앞 (지휘자석) · 지휘자가 바라본 방향</text>`;
   // 맨 앞줄(1줄)이 그림 아래쪽: 지휘자(맨 앞)가 바라본 모습 그대로
   result.left.forEach((row, i) => {
     const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
