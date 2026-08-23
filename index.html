@@ -12,10 +12,12 @@
   .inputs input { font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 8px; width: 100%; box-sizing: border-box; }
   button.action { width: 100%; font-size: 18px; padding: 12px; border: 0; border-radius: 8px; background: #4E79A7; color: #fff; margin-bottom: 8px; cursor: pointer; }
   button.action.secondary { background: #59A14F; }
+  button.action.kakao { background: #FEE500; color: #3C1E1E; font-weight: bold; }
   .stepper { display: flex; gap: 6px; }
   .stepper input { flex: 1; min-width: 0; text-align: center; }
   .stepper button { width: 52px; font-size: 26px; padding: 0; border: 1px solid #ccc; border-radius: 8px; background: #eee; color: #333; cursor: pointer; }
   #error { color: #c0392b; font-weight: bold; white-space: pre-line; margin: 8px 0; }
+  #notice { color: #33608f; font-size: 14px; white-space: pre-line; margin: 8px 0; }
   #chartWrap svg { width: 100%; height: auto; background: #fff; border: 1px solid #eee; border-radius: 8px; }
   .note { font-size: 12px; color: #888; text-align: center; }
 </style>
@@ -54,7 +56,9 @@
 </div>
 <button id="assignBtn" class="action">배치하기</button>
 <button id="saveBtn" class="action secondary" hidden>이미지로 저장</button>
+<button id="shareBtn" class="action kakao" hidden>카톡으로 공유</button>
 <div id="error"></div>
+<div id="notice"></div>
 <div id="chartWrap"></div>
 <p class="note">배치도는 지휘자가 찬양대를 바라본 방향 기준입니다.</p>
 <script src="assign.js"></script>
@@ -188,15 +192,19 @@ function runAssign() {
   const errorEl = document.getElementById("error");
   const wrap = document.getElementById("chartWrap");
   const saveBtn = document.getElementById("saveBtn");
+  const shareBtn = document.getElementById("shareBtn");
+  document.getElementById("notice").textContent = "";
   if (!result.ok) {
     errorEl.textContent = result.errors.join("\n");
     wrap.innerHTML = "";
     saveBtn.hidden = true;
+    shareBtn.hidden = true;
     return;
   }
   errorEl.textContent = "";
   wrap.innerHTML = renderChart(result);
   saveBtn.hidden = false;
+  shareBtn.hidden = false;
 }
 document.getElementById("assignBtn").addEventListener("click", runAssign);
 
@@ -209,7 +217,8 @@ document.querySelectorAll(".stepper button").forEach(btn => {
   });
 });
 
-function svgToPngDataUrl() {
+// 화면의 SVG 배치도를 그대로 캔버스에 그린다(저장·공유 공통).
+function svgToCanvas() {
   return new Promise((resolve, reject) => {
     const svg = document.getElementById("chart");
     if (!svg) return reject(new Error("배치도가 없습니다"));
@@ -227,26 +236,61 @@ function svgToPngDataUrl() {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/png"));
+      resolve(canvas);
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("이미지 변환 실패")); };
     img.src = url;
   });
 }
+function svgToPngDataUrl() { return svgToCanvas().then(c => c.toDataURL("image/png")); }
+function svgToPngFile() {
+  return svgToCanvas().then(canvas => new Promise((resolve, reject) => {
+    canvas.toBlob(b => {
+      if (!b) return reject(new Error("이미지 변환 실패"));
+      resolve(new File([b], pngFileName(), { type: "image/png" }));
+    }, "image/png");
+  }));
+}
+function pngFileName() {
+  const today = new Date().toISOString().slice(0, 10);
+  return `자리배치_${today}.png`;
+}
 window.__testPng = svgToPngDataUrl;
 
+const noticeEl = document.getElementById("notice");
+const errorEl2 = document.getElementById("error");
+
 document.getElementById("saveBtn").addEventListener("click", async () => {
+  noticeEl.textContent = "";
   try {
     const dataUrl = await svgToPngDataUrl();
-    const today = new Date().toISOString().slice(0, 10);
     const a = document.createElement("a");
-    a.download = `자리배치_${today}.png`;
+    a.download = pngFileName();
     a.href = dataUrl;
     document.body.appendChild(a);
     a.click();
     a.remove();
   } catch (e) {
-    document.getElementById("error").textContent = "이미지 저장 중 문제가 생겼어요: " + e.message;
+    errorEl2.textContent = "이미지 저장 중 문제가 생겼어요: " + e.message;
+  }
+});
+
+// 휴대폰의 공유 기능(공유 시트)을 띄운다. 목록에서 카카오톡을 고르면 바로 전송된다.
+// 공유 기능이 없는 기기(주로 PC)에서는 저장 후 직접 첨부하도록 안내한다.
+document.getElementById("shareBtn").addEventListener("click", async () => {
+  noticeEl.textContent = "";
+  errorEl2.textContent = "";
+  try {
+    const file = await svgToPngFile();
+    if (!navigator.canShare || !navigator.canShare({ files: [file] })) {
+      noticeEl.textContent = "이 기기에서는 바로 공유가 안 돼요.\n'이미지로 저장'을 누른 뒤, 카톡에서 사진으로 첨부해 보내주세요.";
+      return;
+    }
+    await navigator.share({ files: [file], title: "찬양대 자리배치" });
+  } catch (e) {
+    if (e && e.name === "AbortError") return; // 사용자가 공유를 취소함
+    noticeEl.textContent = "공유하지 못했어요: " + e.message +
+      "\n'이미지로 저장'을 누른 뒤, 카톡에서 사진으로 첨부해 보내주세요.";
   }
 });
 </script>
