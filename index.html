@@ -20,10 +20,17 @@
   #notice { color: #33608f; font-size: 14px; white-space: pre-line; margin: 8px 0; }
   #chartWrap svg { width: 100%; height: auto; background: #fff; border: 1px solid #eee; border-radius: 8px; }
   .note { font-size: 12px; color: #888; text-align: center; }
+  #kakaoBanner { background: #fff8d6; border: 1px solid #e6d375; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  #kakaoBanner p { margin: 0 0 10px; font-size: 14px; color: #6b5a12; line-height: 1.5; }
+  #kakaoBanner button { margin-bottom: 0; }
 </style>
 </head>
 <body>
 <h1>찬양대 자리배치</h1>
+<div id="kakaoBanner" hidden>
+  <p>카카오톡 안에서 열면 카톡으로 공유·이미지 저장이 막혀 있어요.<br>아래 버튼을 눌러 크롬·사파리에서 열어 주세요.</p>
+  <button id="openExternalBtn" class="action" type="button">크롬·사파리에서 열기</button>
+</div>
 <div class="inputs">
   <label>소프라노
     <div class="stepper">
@@ -71,6 +78,7 @@ const ROW_GAP = 80;                      // 앞뒤 줄 간격: 의자 한 줄(46
 const CHART_W = 1370, CHART_H = 895;   // 그림 전체 크기 (아래쪽에 큰 글씨 범례 2줄이 들어간다)
 const LABEL_SIZE = 45;                   // "▼ 앞 (지휘자석)" 글자 크기 (18 → 2.5배)
 const LEGEND_SIZE = 55;                  // 파트 이름 글자 크기 (22 → 2.5배)
+const TOTAL_SIZE = 72;                   // 총원 글자 크기 (파트 이름보다 크게)
 const LEFT_X = 90;                       // 왼쪽 블록 시작 x
 const RIGHT_EDGE = 1280;                 // 오른쪽 블록의 오른쪽 끝 x (90도 수직 변 — 사다리꼴의 직각 쪽)
 const NUM_SIZE = 92;                     // 인원 숫자 크기 (벌려 놓은 앞뒤 공간을 꽉 채움)
@@ -179,14 +187,18 @@ function renderChart(result) {
     const w = row.capacity * SEAT + PAD * 2;
     s += rowSvg(RIGHT_EDGE - w, y, row.capacity, "bass", row.bass, "tenor", row.tenor, i, true, "right", rightGap, 1, false);
   });
-  // 범례: 글자가 커서 한 줄에 넷이 안 들어가므로 2개씩 두 줄로 놓는다.
+  // 범례: 글자가 커서 한 줄에 넷이 안 들어가므로 2개씩 두 줄로 놓고,
+  // 그 오른쪽 옆에 총원을 파트 이름보다 크게 적는다.
   const legendY = 785, legendRowGap = 72;
   ["soprano", "alto", "bass", "tenor"].forEach((part, i) => {
-    const x = 200 + (i % 2) * 580;
+    const x = 70 + (i % 2) * 460;
     const y = legendY + Math.floor(i / 2) * legendRowGap;
     s += `<circle cx="${x}" cy="${y}" r="22" fill="${COLORS[part]}"/>`;
     s += `<text x="${x + 40}" y="${y + 19}" font-family="sans-serif" font-size="${LEGEND_SIZE}" fill="#333">${NAMES[part]} ${counts[part]}명</text>`;
   });
+  const totalAll = counts.soprano + counts.alto + counts.bass + counts.tenor;
+  const totalY = legendY + legendRowGap / 2 + TOTAL_SIZE * 0.35;
+  s += `<text x="1330" y="${totalY}" text-anchor="end" font-family="sans-serif" font-size="${TOTAL_SIZE}" font-weight="bold" fill="#222">총원 ${totalAll}명</text>`;
   return s + `</svg>`;
 }
 
@@ -264,6 +276,17 @@ window.__testPng = svgToPngDataUrl;
 const noticeEl = document.getElementById("notice");
 const errorEl2 = document.getElementById("error");
 
+// 카카오톡 안에서 링크를 열면 카카오톡이 만든 간이 브라우저가 뜬다.
+// 이 브라우저는 웹페이지의 공유·저장 기능을 막아 놓아서 카톡으로 바로 보낼 수 없다.
+// 카카오톡이 제공하는 전용 주소로 크롬·사파리 같은 진짜 브라우저에서 다시 열게 한다.
+function isKakaoInApp() { return /KAKAOTALK/i.test(navigator.userAgent); }
+function externalOpenUrl() {
+  return "kakaotalk://web/openExternal?url=" + encodeURIComponent(location.href);
+}
+function openInExternalBrowser() { location.href = externalOpenUrl(); }
+document.getElementById("openExternalBtn").addEventListener("click", openInExternalBrowser);
+if (isKakaoInApp()) document.getElementById("kakaoBanner").hidden = false;
+
 document.getElementById("saveBtn").addEventListener("click", async () => {
   noticeEl.textContent = "";
   try {
@@ -274,6 +297,9 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
     document.body.appendChild(a);
     a.click();
     a.remove();
+    if (isKakaoInApp()) {
+      noticeEl.textContent = "카카오톡 안의 브라우저에서는 저장이 안 될 수 있어요.\n저장되지 않았다면 맨 위의 '크롬·사파리에서 열기'를 눌러 주세요.";
+    }
   } catch (e) {
     errorEl2.textContent = "이미지 저장 중 문제가 생겼어요: " + e.message;
   }
@@ -284,6 +310,11 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
 document.getElementById("shareBtn").addEventListener("click", async () => {
   noticeEl.textContent = "";
   errorEl2.textContent = "";
+  if (isKakaoInApp()) {
+    noticeEl.textContent = "카카오톡 안의 브라우저에서는 공유가 막혀 있어요.\n크롬·사파리로 열어 드릴게요. 창이 바뀌지 않으면 맨 위의 '크롬·사파리에서 열기'를 눌러 주세요.";
+    openInExternalBrowser();
+    return;
+  }
   try {
     const file = await svgToPngFile();
     if (!navigator.canShare || !navigator.canShare({ files: [file] })) {
