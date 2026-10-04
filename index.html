@@ -7,6 +7,8 @@
 <style>
   body { font-family: "Malgun Gothic", sans-serif; margin: 0 auto; padding: 16px; max-width: 720px; background: #fafafa; }
   h1 { font-size: 22px; text-align: center; }
+  .date-field { display:flex; align-items:center; gap:12px; margin-bottom:16px; font-size:18px; }
+  .date-field input { font:inherit; padding:8px; min-width:0; }
   .inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .inputs label { display: flex; flex-direction: column; font-size: 14px; gap: 4px; }
   .inputs input { font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 8px; width: 100%; box-sizing: border-box; }
@@ -31,37 +33,37 @@
   <p>카카오톡 안에서 열면 카톡으로 공유·이미지 저장이 막혀 있어요.<br>아래 버튼을 눌러 크롬·사파리에서 열어 주세요.</p>
   <button id="openExternalBtn" class="action" type="button">크롬·사파리에서 열기</button>
 </div>
+<label class="date-field">날짜 <input id="serviceDate" type="date"></label>
 <div class="inputs">
   <label>소프라노
     <div class="stepper">
       <button type="button" data-part="soprano" data-delta="-1">−</button>
-      <input id="soprano" type="number" min="0" inputmode="numeric" placeholder="0">
+      <input id="soprano" type="text" inputmode="numeric" pattern="[0-9]*" value="0">
       <button type="button" data-part="soprano" data-delta="1">+</button>
     </div>
   </label>
   <label>알토
     <div class="stepper">
       <button type="button" data-part="alto" data-delta="-1">−</button>
-      <input id="alto" type="number" min="0" inputmode="numeric" placeholder="0">
+      <input id="alto" type="text" inputmode="numeric" pattern="[0-9]*" value="0">
       <button type="button" data-part="alto" data-delta="1">+</button>
     </div>
   </label>
   <label>테너
     <div class="stepper">
       <button type="button" data-part="tenor" data-delta="-1">−</button>
-      <input id="tenor" type="number" min="0" inputmode="numeric" placeholder="0">
+      <input id="tenor" type="text" inputmode="numeric" pattern="[0-9]*" value="0">
       <button type="button" data-part="tenor" data-delta="1">+</button>
     </div>
   </label>
   <label>베이스
     <div class="stepper">
       <button type="button" data-part="bass" data-delta="-1">−</button>
-      <input id="bass" type="number" min="0" inputmode="numeric" placeholder="0">
+      <input id="bass" type="text" inputmode="numeric" pattern="[0-9]*" value="0">
       <button type="button" data-part="bass" data-delta="1">+</button>
     </div>
   </label>
 </div>
-<button id="assignBtn" class="action">배치하기</button>
 <button id="saveBtn" class="action secondary" hidden>이미지로 저장</button>
 <button id="shareBtn" class="action kakao" hidden>카톡으로 공유</button>
 <div id="error"></div>
@@ -75,7 +77,7 @@ const NAMES = { soprano: "소프라노", alto: "알토", tenor: "테너", bass: 
 const NUM_COLORS = { soprano: "#E15759", alto: "#C9A227", bass: "#4E79A7", tenor: "#59A14F" };
 const SEAT = 38, R = 15, BENCH_H = 46, TOP = 20, PAD = 8;
 const ROW_GAP = 80;                      // 앞뒤 줄 간격: 의자 한 줄(46)보다 넉넉히 벌린다(그 공간에 인원 숫자를 쓴다)
-const CHART_W = 1370, CHART_H = 895;   // 그림 전체 크기 (아래쪽에 큰 글씨 범례 2줄이 들어간다)
+const CHART_W = 1370, CHART_H = 965;   // 그림 전체 크기 (아래쪽에 큰 글씨 범례 2줄이 들어간다)
 const LABEL_SIZE = 45;                   // "▼ 앞 (지휘자석)" 글자 크기 (18 → 2.5배)
 const LEGEND_SIZE = 55;                  // 파트 이름 글자 크기 (22 → 2.5배)
 const TOTAL_SIZE = 72;                   // 총원 글자 크기 (파트 이름보다 크게)
@@ -199,6 +201,10 @@ function renderChart(result) {
   const totalAll = counts.soprano + counts.alto + counts.bass + counts.tenor;
   const totalY = legendY + legendRowGap / 2 + TOTAL_SIZE * 0.35;
   s += `<text x="1330" y="${totalY}" text-anchor="end" font-family="sans-serif" font-size="${TOTAL_SIZE}" font-weight="bold" fill="#222">총원 ${totalAll}명</text>`;
+  const selectedDate = document.getElementById("serviceDate").value;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) {
+    s += `<text x="${CHART_W / 2}" y="945" text-anchor="middle" font-family="sans-serif" font-size="45" fill="#333">${selectedDate.replaceAll("-", ".")}</text>`;
+  }
   return s + `</svg>`;
 }
 
@@ -222,7 +228,18 @@ function runAssign() {
   saveBtn.hidden = false;
   shareBtn.hidden = false;
 }
-document.getElementById("assignBtn").addEventListener("click", runAssign);
+function localDate() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+}
+const dateInput = document.getElementById("serviceDate");
+dateInput.value = localDate();
+dateInput.addEventListener("input", runAssign);
+document.querySelectorAll(".stepper input").forEach(input => {
+  input.addEventListener("input", runAssign);
+  input.addEventListener("focus", () => input.select());
+  input.addEventListener("click", () => input.select());
+});
 
 // +/- 버튼: 한 번 누르면 인원 변경과 배치도 갱신이 동시에 된다.
 document.querySelectorAll(".stepper button").forEach(btn => {
@@ -268,7 +285,7 @@ function svgToPngFile() {
   }));
 }
 function pngFileName() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = document.getElementById("serviceDate").value || localDate();
   return `자리배치_${today}.png`;
 }
 window.__testPng = svgToPngDataUrl;
@@ -328,6 +345,7 @@ document.getElementById("shareBtn").addEventListener("click", async () => {
       "\n'이미지로 저장'을 누른 뒤, 카톡에서 사진으로 첨부해 보내주세요.";
   }
 });
+runAssign();
 </script>
 </body>
 </html>
