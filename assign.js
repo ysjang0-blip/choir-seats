@@ -63,7 +63,7 @@ function balanceToTargets(a, b, targets) {
 
 // 정중앙 팔걸이 양쪽은 각각 6석이다.
 function sopranoSplit(soprano, alto) {
-  const left = Math.min(soprano, 6);
+  const left = Math.min(soprano, Math.ceil((soprano + alto) / 2));
   return { left, right: soprano - left };
 }
 

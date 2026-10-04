@@ -108,8 +108,8 @@ function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag,
     if (leftBlock) {
       const middle = x + w / 2;
       const split = sopranoSplit(leftN, rightN);
-      const leftCount = split.left + Math.max(0, rightN - 6);
-      const rightCount = split.right + Math.min(rightN, 6);
+      const leftCount = Math.ceil(total / 2);
+      const rightCount = total - leftCount;
       const placeHalf = (lo, hi, count) => {
         if (!count) return;
         if (count === 1) { xs.push((lo + hi) / 2); return; }
