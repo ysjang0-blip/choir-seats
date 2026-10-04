@@ -105,7 +105,22 @@ function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag,
   if (total > 0) {
     const cy = y + BENCH_H / 2;
     const xs = [];
-    if (zigzag) {
+    if (leftBlock) {
+      const middle = x + w / 2;
+      const split = sopranoSplit(leftN, rightN);
+      const leftCount = split.left + Math.max(0, rightN - 6);
+      const rightCount = split.right + Math.min(rightN, 6);
+      const placeHalf = (lo, hi, count) => {
+        if (!count) return;
+        if (count === 1) { xs.push((lo + hi) / 2); return; }
+        const inset = zigzag && rowIndex % 2 !== flushParity ? Math.min(12, (hi - lo - (count - 1) * R * 2) / 2) : 0;
+        const step = (hi - lo - inset) / (count - 1);
+        for (let k = 0; k < count; k++) xs.push(lo + k * step);
+      };
+      placeHalf(x + PAD + R, middle - R - 4, leftCount);
+      placeHalf(middle + R + 4, x + w - PAD - R, rightCount);
+      s += '<line x1="' + middle + '" y1="' + (y + 4) + '" x2="' + middle + '" y2="' + (y + BENCH_H - 4) + '" stroke="#9b8c72" stroke-width="6"/>';
+    } else if (zigzag) {
       // 간격은 블록 전체가 공유(blockGap): 줄마다 간격이 다르면
       // 인원이 다른 줄끼리 지그재그가 어긋나므로 같은 격자 위에 놓는다.
       const gap = blockGap;
