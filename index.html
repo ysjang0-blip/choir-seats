@@ -7,8 +7,6 @@
 <style>
   body { font-family: "Malgun Gothic", sans-serif; margin: 0 auto; padding: 16px; max-width: 720px; background: #fafafa; }
   h1 { font-size: 22px; text-align: center; }
-  .date-field { display:flex; align-items:center; gap:12px; margin-bottom:16px; font-size:18px; }
-  .date-field input { font:inherit; padding:8px; min-width:0; }
   .inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .inputs label { display: flex; flex-direction: column; font-size: 14px; gap: 4px; }
   .inputs input { font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 8px; width: 100%; box-sizing: border-box; }
@@ -33,7 +31,6 @@
   <p>카카오톡 안에서 열면 카톡으로 공유·이미지 저장이 막혀 있어요.<br>아래 버튼을 눌러 크롬·사파리에서 열어 주세요.</p>
   <button id="openExternalBtn" class="action" type="button">크롬·사파리에서 열기</button>
 </div>
-<label class="date-field">날짜 <input id="serviceDate" type="date"></label>
 <div class="inputs">
   <label>소프라노
     <div class="stepper">
@@ -152,8 +149,8 @@ function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag,
       s += num(x + PAD, "start", leftPart, sp.left);              // 소프라노: 좌석 왼쪽 끝 아래
       // 알토 자리로 넘어온 소프라노만 그 인원들의 한가운데 아래에 둔다.
       if (sp.right > 0) {
-        const from = sp.left;
-        s += num((xs[from] + xs[from + sp.right - 1]) / 2, "middle", leftPart, sp.right);
+        // 실제 팔걸이 오른쪽으로 이동한 인원은 중앙에 표시한다.
+        s += num(x + w / 2, "middle", leftPart, sp.right);
       }
     } else {
       s += num(xs[total - 1] + R, "end", rightPart, rightN);      // 테너: 오른쪽 끝 아래
@@ -214,12 +211,9 @@ function renderChart(result) {
     s += `<text x="${x + 40}" y="${y + 19}" font-family="sans-serif" font-size="${LEGEND_SIZE}" fill="#333">${NAMES[part]} ${counts[part]}명</text>`;
   });
   const totalAll = counts.soprano + counts.alto + counts.bass + counts.tenor;
-  const totalY = legendY + legendRowGap / 2 + TOTAL_SIZE * 0.35;
+  const totalY = 806;
   s += `<text x="1330" y="${totalY}" text-anchor="end" font-family="sans-serif" font-size="${TOTAL_SIZE}" font-weight="bold" fill="#222">총원 ${totalAll}명</text>`;
-  const selectedDate = document.getElementById("serviceDate").value;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) {
-    s += `<text x="${CHART_W / 2}" y="945" text-anchor="middle" font-family="sans-serif" font-size="45" fill="#333">${selectedDate.replaceAll("-", ".")}</text>`;
-  }
+  s += `<text x="1330" y="880" text-anchor="end" font-family="sans-serif" font-size="45" fill="#333">${localDate().replaceAll("-", ".")}</text>`;
   return s + `</svg>`;
 }
 
@@ -247,9 +241,6 @@ function localDate() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
 }
-const dateInput = document.getElementById("serviceDate");
-dateInput.value = localDate();
-dateInput.addEventListener("input", runAssign);
 document.querySelectorAll(".stepper input").forEach(input => {
   input.addEventListener("input", runAssign);
   input.addEventListener("focus", () => input.select());
@@ -300,7 +291,7 @@ function svgToPngFile() {
   }));
 }
 function pngFileName() {
-  const today = document.getElementById("serviceDate").value || localDate();
+  const today = localDate();
   return `자리배치_${today}.png`;
 }
 window.__testPng = svgToPngDataUrl;
