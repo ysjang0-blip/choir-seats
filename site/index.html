@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>찬양대 자리배치</title>
+<style>
+  body { font-family: "Malgun Gothic", sans-serif; margin: 0 auto; padding: 16px; max-width: 720px; background: #fafafa; }
+  h1 { font-size: 22px; text-align: center; }
+  .inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .inputs label { display: flex; flex-direction: column; font-size: 14px; gap: 4px; }
+  .inputs input { font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 8px; width: 100%; box-sizing: border-box; }
+  button.action { width: 100%; font-size: 18px; padding: 12px; border: 0; border-radius: 8px; background: #4E79A7; color: #fff; margin-bottom: 8px; cursor: pointer; }
+  button.action.secondary { background: #59A14F; }
+  button.action.kakao { background: #FEE500; color: #3C1E1E; font-weight: bold; }
+  .stepper { display: flex; gap: 6px; }
+  .stepper input { flex: 1; min-width: 0; text-align: center; }
+  .stepper button { width: 52px; font-size: 26px; padding: 0; border: 1px solid #ccc; border-radius: 8px; background: #eee; color: #333; cursor: pointer; }
+  #error { color: #c0392b; font-weight: bold; white-space: pre-line; margin: 8px 0; }
+  #notice { color: #33608f; font-size: 14px; white-space: pre-line; margin: 8px 0; }
+  #chartWrap svg { width: 100%; height: auto; background: #fff; border: 1px solid #eee; border-radius: 8px; }
+  .note { font-size: 12px; color: #888; text-align: center; }
+  #kakaoBanner { background: #fff8d6; border: 1px solid #e6d375; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  #kakaoBanner p { margin: 0 0 10px; font-size: 14px; color: #6b5a12; line-height: 1.5; }
+  #kakaoBanner button { margin-bottom: 0; }
+</style>
+</head>
+<body>
+<h1>찬양대 자리배치</h1>
+<div id="kakaoBanner" hidden>
+  <p>카카오톡 안에서 열면 카톡으로 공유·이미지 저장이 막혀 있어요.<br>아래 버튼을 눌러 크롬·사파리에서 열어 주세요.</p>
+  <button id="openExternalBtn" class="action" type="button">크롬·사파리에서 열기</button>
+</div>
+<div class="inputs">
+  <label>소프라노
+    <div class="stepper">
+      <button type="button" data-part="soprano" data-delta="-1">−</button>
+      <input id="soprano" type="text" inputmode="numeric" pattern="[0-9]*" value="0">
+      <button type="button" data-part="soprano" data-delta="1">+</button>
+    </div>
+  </label>
+  <label>알토
+    <div class="stepper">
+      <button type="button" data-part="alto" data-delta="-1">−</button>
+      <input id="alto" type="text" inputmode="numeric" pattern="[0-9]*" value="0">
+      <button type="button" data-part="alto" data-delta="1">+</button>
+    </div>
+  </label>
+  <label>테너
+    <div class="stepper">
+      <button type="button" data-part="tenor" data-delta="-1">−</button>
+      <input id="tenor" type="text" inputmode="numeric" pattern="[0-9]*" value="0">
+      <button type="button" data-part="tenor" data-delta="1">+</button>
+    </div>
+  </label>
+  <label>베이스
+    <div class="stepper">
+      <button type="button" data-part="bass" data-delta="-1">−</button>
+      <input id="bass" type="text" inputmode="numeric" pattern="[0-9]*" value="0">
+      <button type="button" data-part="bass" data-delta="1">+</button>
+    </div>
+  </label>
+</div>
+<button id="saveBtn" class="action secondary" hidden>이미지로 저장</button>
+<button id="shareBtn" class="action kakao" hidden>카톡으로 공유</button>
+<div id="error"></div>
+<div id="notice"></div>
+<div id="chartWrap"></div>
+<p class="note">배치도는 지휘자가 찬양대를 바라본 방향 기준입니다.</p>
+<script src="assign.js"></script>
+<script src="emoji-assets.js?v=20261005-color3"></script>
+<script>
+const COLORS = { soprano: "#168DDF", alto: "#D66A12", bass: "#D83232", tenor: "#292929" };
+const NAMES = { soprano: "소프라노", alto: "알토", tenor: "테너", bass: "베이스" };
+const NUM_COLORS = { soprano: "#168DDF", alto: "#D66A12", bass: "#D83232", tenor: "#292929" };
+const SEAT = 38, R = 15, BENCH_H = 46, TOP = 20, PAD = 8;
+const ROW_GAP = 80;                      // 앞뒤 줄 간격: 의자 한 줄(46)보다 넉넉히 벌린다(그 공간에 인원 숫자를 쓴다)
+const CHART_W = 1370, CHART_H = 965;   // 그림 전체 크기 (아래쪽에 큰 글씨 범례 2줄이 들어간다)
+const LABEL_SIZE = 45;                   // "▼ 앞 (지휘자석)" 글자 크기 (18 → 2.5배)
+const LEGEND_SIZE = 55;                  // 파트 이름 글자 크기 (22 → 2.5배)
+const TOTAL_SIZE = 72;                   // 총원 글자 크기 (파트 이름보다 크게)
+const LEFT_X = 90;                       // 왼쪽 블록 시작 x
+const RIGHT_EDGE = 1280;                 // 오른쪽 블록의 오른쪽 끝 x (90도 수직 변 — 사다리꼴의 직각 쪽)
+const NUM_SIZE = 92;                     // 인원 숫자 크기 (벌려 놓은 앞뒤 공간을 꽉 채움)
+
+function seatEmoji(cx, cy, part, size = 32) {
+  return `<image data-part="${part}" x="${cx - size / 2}" y="${cy - size / 2}" width="${size}" height="${size}" href="${CHOIR_EMOJI[part]}"/>`;
+}
+// 한 줄: 왼쪽부터 leftN명은 leftPart 색, 나머지는 rightPart 색.
+// 지그재그일 때는 줄 전체를 통째로 옮긴다. 기준은 가운데 통로 쪽(anchor):
+// 1·3·5번째 줄은 가운데 쪽 끝에 바짝 붙고(반대쪽 끝은 띄워짐),
+// 2·4번째 줄은 반 칸 물러나 앞줄과 엇갈린다.
+// 지그재그가 아니면(일렬) 모든 줄이 같은 간격으로 놓이고 각 줄을 의자 가운데에 맞춘다.
+// blockGap은 지그재그일 때는 지그재그 간격, 일렬일 때는 일렬 간격이다.
+// 인원 숫자는 의자 바로 아래(앞뒤로 벌려 놓은 빈 공간)에 쓴다.
+//  - 왼쪽 블록(leftBlock): 맨 오른쪽 끝에 알토 인원,
+//    소프라노 자리의 오른쪽 끝에 알토 자리로 넘어온 소프라노(5-알토), 왼쪽 끝에 나머지 소프라노
+//  - 오른쪽 블록: 왼쪽 끝에 베이스 인원, 오른쪽 끝에 테너 인원
+function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag, anchor, blockGap, flushParity, leftBlock) {
+  const w = cap * SEAT + PAD * 2;
+  let s = `<rect x="${x}" y="${y}" width="${w}" height="${BENCH_H}" rx="10" fill="#f5efe3" stroke="#c9bda5"/>`;
+  const total = leftN + rightN;
+  if (total > 0) {
+    const cy = y + BENCH_H / 2;
+    const xs = [];
+    if (leftBlock) {
+      const middle = x + w / 2;
+      const leftCount = Math.ceil(total / 2);
+      const rightCount = total - leftCount;
+      const placeHalf = (lo, hi, count, side) => {
+        if (!count) return;
+        const span = (count - 1) * blockGap;
+        // 1·3·5줄은 왼쪽, 2·4줄은 오른쪽이 중앙에 붙는다.
+        const flush = side === "left" ? rowIndex % 2 === 0 : rowIndex % 2 === 1;
+        const offset = zigzag && !flush ? blockGap / 2 : 0;
+        const start = zigzag
+          ? (side === "left" ? hi - offset - span : lo + offset)
+          : (lo + hi - span) / 2;
+        for (let k = 0; k < count; k++) xs.push(start + k * blockGap);
+      };
+      placeHalf(x + PAD + R, middle - R - 4, leftCount, "left");
+      placeHalf(middle + R + 4, x + w - PAD - R, rightCount, "right");
+      s += '<line x1="' + middle + '" y1="' + (y + 4) + '" x2="' + middle + '" y2="' + (y + BENCH_H - 4) + '" stroke="#b8ad99" stroke-width="1" stroke-opacity="0.45"/>';
+    } else if (zigzag) {
+      // 간격은 블록 전체가 공유(blockGap): 줄마다 간격이 다르면
+      // 인원이 다른 줄끼리 지그재그가 어긋나므로 같은 격자 위에 놓는다.
+      const gap = blockGap;
+      // flushParity와 홀짝이 같은 줄이 anchor 쪽 끝에 바짝 붙고, 나머지는 반 칸 안쪽
+      // (왼쪽 블록: 1·3·5줄이 오른쪽 끝, 오른쪽 블록: 2·4줄이 오른쪽 끝)
+      const offset = rowIndex % 2 === flushParity ? 0 : gap / 2;
+      for (let k = 0; k < total; k++) {
+        if (anchor === "right") xs.push(x + w - PAD - R - offset - (total - 1 - k) * gap);
+        else xs.push(x + PAD + R + offset + k * gap);
+      }
+    } else {
+      // 일렬: 모든 줄이 같은 간격을 쓰고, 줄 전체를 의자 가운데에 맞춘다.
+      // 남는 여유가 양 끝으로 반씩 나뉘므로 한쪽 끝에만 빈틈이 몰리지 않는다.
+      const span = (total - 1) * blockGap;
+      const start = x + w / 2 - span / 2;
+      for (let k = 0; k < total; k++) xs.push(start + k * blockGap);
+    }
+    xs.forEach((cx, k) => { s += seatEmoji(cx, cy, k < leftN ? leftPart : rightPart); });
+
+    // 의자 아래 빈 공간의 가운데에 숫자를 쓴다.
+    const ty = y + BENCH_H + ROW_GAP / 2 + NUM_SIZE * 0.35;
+    const num = (nx, align, part, v) => v > 0
+      ? `<text x="${nx}" y="${ty}" text-anchor="${align}" font-family="sans-serif" font-size="${NUM_SIZE}" font-weight="bold" fill="${NUM_COLORS[part]}">${v}</text>`
+      : "";
+    if (leftBlock) {
+      const sp = sopranoSplit(leftN, rightN);
+      // 알토와 소프라노 왼쪽 숫자는 사람 끝이 아니라 의자(좌석) 끝에 맞춘다.
+      s += num(x + w - PAD, "end", rightPart, rightN);            // 알토: 좌석 오른쪽 끝 아래
+      s += num(x + PAD, "start", leftPart, sp.left);              // 소프라노: 좌석 왼쪽 끝 아래
+      // 알토 자리로 넘어온 소프라노만 그 인원들의 한가운데 아래에 둔다.
+      if (sp.right > 0) {
+        // 실제 팔걸이 오른쪽으로 이동한 인원은 중앙에 표시한다.
+        s += num(x + w / 2, "middle", leftPart, sp.right);
+      }
+    } else {
+      s += num(xs[total - 1] + R, "end", rightPart, rightN);      // 테너: 오른쪽 끝 아래
+      s += num(xs[0] - R, "start", leftPart, leftN);              // 베이스: 왼쪽 끝 아래
+    }
+  }
+  return s;
+}
+
+function renderChart(result) {
+  const counts = {
+    soprano: result.left.reduce((a, r) => a + r.soprano, 0),
+    alto: result.left.reduce((a, r) => a + r.alto, 0),
+    bass: result.right.reduce((a, r) => a + r.bass, 0),
+    tenor: result.right.reduce((a, r) => a + r.tenor, 0),
+  };
+  // 소프라노+알토 합이 50명부터는 왼쪽 블록은 지그재그 없이 똑바로 줄을 선다.
+  const leftZigzag = counts.soprano + counts.alto < 50;
+  // 블록 공통 지그재그 간격: 각 줄이 의자를 최대한 채우도록 간격을 벌리되,
+  // 어떤 줄도 의자를 벗어나지 않는 값(줄별 최소치)을 쓴다.
+  // 끝에 바짝 붙는 줄은 (인원-1)칸, 반 칸 물러나는 줄은 (인원-0.5)칸을 차지한다.
+  const gapOf = (rows, flushParity) => {
+    const cands = rows.filter(r => r.total > 0)
+      .map(r => (r.cap * SEAT - R * 2) / Math.max(r.total - (r.i % 2 === flushParity ? 1 : 0.5), 1.5));
+    return cands.length ? Math.min(...cands) : 0;
+  };
+  // 일렬일 때의 블록 공통 간격: 가장 인원이 많은 줄이 의자를 끝에서 끝까지 채우는 값.
+  // 인원이 적은 줄도 같은 간격을 쓰고 가운데 정렬하므로 줄끼리 간격이 어긋나지 않는다.
+  const straightGapOf = rows => {
+    const cands = rows.filter(r => r.total > 1).map(r => (r.cap * SEAT - R * 2) / (r.total - 1));
+    return cands.length ? Math.min(...cands) : 0;
+  };
+  const leftRows = result.left.map((r, i) => ({ cap: r.capacity, total: r.soprano + r.alto, i }));
+  // 팔걸이 양쪽에서도 모든 줄이 같은 격자를 공유한다.
+  const halfGapCandidates = leftRows.flatMap(r => {
+    const span = (r.cap * SEAT + PAD * 2) / 2 - PAD - R * 2 - 4;
+    return [Math.ceil(r.total / 2), Math.floor(r.total / 2)]
+      .map((n, side) => ({ n, flush: side === 0 ? r.i % 2 === 0 : r.i % 2 === 1 }))
+      .filter(h => h.n > 0).map(h => span / Math.max(1,
+        h.n - (leftZigzag && !h.flush ? 0.5 : 1)));
+  });
+  const leftGap = halfGapCandidates.length ? Math.min(...halfGapCandidates) : 0;
+  const rightGap = gapOf(result.right.map((r, i) => ({ cap: r.capacity, total: r.bass + r.tenor, i })), 1);
+  let s = `<svg id="chart" xmlns="http://www.w3.org/2000/svg" width="${CHART_W}" height="${CHART_H}" viewBox="0 0 ${CHART_W} ${CHART_H}">`;
+  s += `<rect x="0" y="0" width="${CHART_W}" height="${CHART_H}" fill="#ffffff"/>`;
+  s += `<text x="${CHART_W / 2}" y="705" text-anchor="middle" font-family="sans-serif" font-size="${LABEL_SIZE}" fill="#666">▲ 앞 (지휘자석) · 지휘자가 바라본 방향</text>`;
+  // 맨 앞줄(1줄)이 그림 아래쪽: 지휘자(맨 앞)가 바라본 모습 그대로
+  result.left.forEach((row, i) => {
+    const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
+    s += rowSvg(LEFT_X, y, row.capacity, "soprano", row.soprano, "alto", row.alto, i, leftZigzag, "right", leftGap, 0, true);
+  });
+  // 오른쪽 블록: 오른쪽 끝을 수직으로 맞추고(90도), 의자가 뒤로 갈수록 길어져 왼쪽이 사선인 사다리꼴.
+  // 사람은 오른쪽 끝 기준으로 앉히되 2·4줄이 끝에 바짝 붙는다.
+  result.right.forEach((row, i) => {
+    const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
+    const w = row.capacity * SEAT + PAD * 2;
+    s += rowSvg(RIGHT_EDGE - w, y, row.capacity, "bass", row.bass, "tenor", row.tenor, i, true, "right", rightGap, 1, false);
+  });
+  // 범례: 글자가 커서 한 줄에 넷이 안 들어가므로 2개씩 두 줄로 놓고,
+  // 그 오른쪽 옆에 총원을 파트 이름보다 크게 적는다.
+  const legendY = 785, legendRowGap = 72;
+  ["soprano", "alto", "bass", "tenor"].forEach((part, i) => {
+    const x = 70 + (i % 2) * 460;
+    const y = legendY + Math.floor(i / 2) * legendRowGap;
+    s += seatEmoji(x, y, part, 52);
+    s += `<text x="${x + 40}" y="${y + 19}" font-family="sans-serif" font-size="${LEGEND_SIZE}" fill="#333">${NAMES[part]} ${counts[part]}명</text>`;
+  });
+  const totalAll = counts.soprano + counts.alto + counts.bass + counts.tenor;
+  const totalY = 806;
+  s += `<text x="1330" y="${totalY}" text-anchor="end" font-family="sans-serif" font-size="${TOTAL_SIZE}" font-weight="bold" fill="#222">총원 ${totalAll}명</text>`;
+  s += `<text x="1330" y="880" text-anchor="end" font-family="sans-serif" font-size="45" fill="#333">${localDate().replaceAll("-", ".")}</text>`;
+  return s + `</svg>`;
+}
+
+function runAssign() {
+  const num = id => Number(document.getElementById(id).value || 0);
+  const result = assignSeats({ soprano: num("soprano"), alto: num("alto"), tenor: num("tenor"), bass: num("bass") });
+  const errorEl = document.getElementById("error");
+  const wrap = document.getElementById("chartWrap");
+  const saveBtn = document.getElementById("saveBtn");
+  const shareBtn = document.getElementById("shareBtn");
+  document.getElementById("notice").textContent = "";
+  if (!result.ok) {
+    errorEl.textContent = result.errors.join("\n");
+    wrap.innerHTML = "";
+    saveBtn.hidden = true;
+    shareBtn.hidden = true;
+    return;
+  }
+  errorEl.textContent = "";
+  wrap.innerHTML = renderChart(result);
+  saveBtn.hidden = false;
+  shareBtn.hidden = false;
+}
+function localDate() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+}
+document.querySelectorAll(".stepper input").forEach(input => {
+  input.addEventListener("input", runAssign);
+  input.addEventListener("focus", () => input.select());
+  input.addEventListener("click", () => input.select());
+});
+
+// +/- 버튼: 한 번 누르면 인원 변경과 배치도 갱신이 동시에 된다.
+document.querySelectorAll(".stepper button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const input = document.getElementById(btn.dataset.part);
+    input.value = Math.max(0, (Number(input.value) || 0) + Number(btn.dataset.delta));
+    runAssign();
+  });
+});
+
+// 화면의 SVG 배치도를 그대로 캔버스에 그린다(저장·공유 공통).
+function svgToCanvas() {
+  return new Promise((resolve, reject) => {
+    const svg = document.getElementById("chart");
+    if (!svg) return reject(new Error("배치도가 없습니다"));
+    const xml = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const scale = 2; // 카톡 공유용 고해상도
+      const canvas = document.createElement("canvas");
+      canvas.width = CHART_W * scale;
+      canvas.height = CHART_H * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("이미지 변환 실패")); };
+    img.src = url;
+  });
+}
+function svgToPngDataUrl() { return svgToCanvas().then(c => c.toDataURL("image/png")); }
+function svgToPngFile() {
+  return svgToCanvas().then(canvas => new Promise((resolve, reject) => {
+    canvas.toBlob(b => {
+      if (!b) return reject(new Error("이미지 변환 실패"));
+      resolve(new File([b], pngFileName(), { type: "image/png" }));
+    }, "image/png");
+  }));
+}
+function pngFileName() {
+  const today = localDate();
+  return `자리배치_${today}.png`;
+}
+window.__testPng = svgToPngDataUrl;
+
+const noticeEl = document.getElementById("notice");
+const errorEl2 = document.getElementById("error");
+
+// 카카오톡 안에서 링크를 열면 카카오톡이 만든 간이 브라우저가 뜬다.
+// 이 브라우저는 웹페이지의 공유·저장 기능을 막아 놓아서 카톡으로 바로 보낼 수 없다.
+// 카카오톡이 제공하는 전용 주소로 크롬·사파리 같은 진짜 브라우저에서 다시 열게 한다.
+function isKakaoInApp() { return /KAKAOTALK/i.test(navigator.userAgent); }
+function externalOpenUrl() {
+  return "kakaotalk://web/openExternal?url=" + encodeURIComponent(location.href);
+}
+function openInExternalBrowser() { location.href = externalOpenUrl(); }
+document.getElementById("openExternalBtn").addEventListener("click", openInExternalBrowser);
+if (isKakaoInApp()) document.getElementById("kakaoBanner").hidden = false;
+
+document.getElementById("saveBtn").addEventListener("click", async () => {
+  noticeEl.textContent = "";
+  try {
+    const dataUrl = await svgToPngDataUrl();
+    const a = document.createElement("a");
+    a.download = pngFileName();
+    a.href = dataUrl;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    if (isKakaoInApp()) {
+      noticeEl.textContent = "카카오톡 안의 브라우저에서는 저장이 안 될 수 있어요.\n저장되지 않았다면 맨 위의 '크롬·사파리에서 열기'를 눌러 주세요.";
+    }
+  } catch (e) {
+    errorEl2.textContent = "이미지 저장 중 문제가 생겼어요: " + e.message;
+  }
+});
+
+// 휴대폰의 공유 기능(공유 시트)을 띄운다. 목록에서 카카오톡을 고르면 바로 전송된다.
+// 공유 기능이 없는 기기(주로 PC)에서는 저장 후 직접 첨부하도록 안내한다.
+document.getElementById("shareBtn").addEventListener("click", async () => {
+  noticeEl.textContent = "";
+  errorEl2.textContent = "";
+  if (isKakaoInApp()) {
+    noticeEl.textContent = "카카오톡 안의 브라우저에서는 공유가 막혀 있어요.\n크롬·사파리로 열어 드릴게요. 창이 바뀌지 않으면 맨 위의 '크롬·사파리에서 열기'를 눌러 주세요.";
+    openInExternalBrowser();
+    return;
+  }
+  try {
+    const file = await svgToPngFile();
+    if (!navigator.canShare || !navigator.canShare({ files: [file] })) {
+      noticeEl.textContent = "이 기기에서는 바로 공유가 안 돼요.\n'이미지로 저장'을 누른 뒤, 카톡에서 사진으로 첨부해 보내주세요.";
+      return;
+    }
+    await navigator.share({ files: [file], title: "찬양대 자리배치" });
+  } catch (e) {
+    if (e && e.name === "AbortError") return; // 사용자가 공유를 취소함
+    noticeEl.textContent = "공유하지 못했어요: " + e.message +
+      "\n'이미지로 저장'을 누른 뒤, 카톡에서 사진으로 첨부해 보내주세요.";
+  }
+});
+runAssign();
+</script>
+</body>
+</html>

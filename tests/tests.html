@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>자리배치 로직 테스트</title></head>
+<body>
+<h1>테스트 결과</h1>
+<ul id="results" style="font-family:monospace"></ul>
+<script src="../site/assign.js"></script>
+<script>
+const results = [];
+function test(name, fn) {
+  try { fn(); results.push({ name, pass: true }); }
+  catch (e) { results.push({ name, pass: false, error: e.message }); }
+}
+function assertEqual(actual, expected, msg) {
+  const a = JSON.stringify(actual), b = JSON.stringify(expected);
+  if (a !== b) throw new Error(`${msg || ""} 기대값 ${b}, 실제 ${a}`);
+}
+function assertTrue(cond, msg) { if (!cond) throw new Error(msg || "조건이 거짓"); }
+
+// ---- Task 1: distributeToRows ----
+test("20명을 12석 5줄에 균등 배분", () =>
+  assertEqual(distributeToRows(20, LEFT_CAPS), [4, 4, 4, 4, 4]));
+test("22명은 나머지 2명이 앞줄부터 추가", () =>
+  assertEqual(distributeToRows(22, LEFT_CAPS), [5, 5, 4, 4, 4]));
+test("0명이면 모든 줄 0명", () =>
+  assertEqual(distributeToRows(0, LEFT_CAPS), [0, 0, 0, 0, 0]));
+test("60명이면 모든 줄 만석", () =>
+  assertEqual(distributeToRows(60, LEFT_CAPS), [12, 12, 12, 12, 12]));
+test("오른쪽 블록 16명은 모든 줄에 균등 배분", () =>
+  assertEqual(distributeToRows(16, RIGHT_CAPS), [4, 4, 4, 4]));
+test("오른쪽 블록 11명은 나머지가 앞줄부터", () =>
+  assertEqual(distributeToRows(11, RIGHT_CAPS), [3, 3, 3, 2]));
+test("앞줄 정원을 넘으면 여유 있는 뒷줄로", () =>
+  assertEqual(distributeToRows(43, RIGHT_CAPS), [8, 10, 12, 13]));
+test("어떤 줄도 좌석 수를 넘지 않음", () => {
+  for (let n = 0; n <= 44; n++) {
+    const rows = distributeToRows(n, RIGHT_CAPS);
+    assertEqual(rows.reduce((a, b) => a + b, 0), n, `합계(${n}명)`);
+    rows.forEach((r, i) => assertTrue(r <= RIGHT_CAPS[i], `${n}명일 때 ${i + 1}줄 초과`));
+  }
+});
+
+// ---- Task 2: assignSeats ----
+function rowTotalsOk(result) {
+  result.left.forEach((row, i) =>
+    assertTrue(row.soprano + row.alto <= row.capacity, `왼쪽 ${i + 1}줄 정원 초과`));
+  result.right.forEach((row, i) =>
+    assertTrue(row.bass + row.tenor <= row.capacity, `오른쪽 ${i + 1}줄 정원 초과`));
+}
+function partSum(rows, part) { return rows.reduce((a, r) => a + r[part], 0); }
+
+test("기본 배치: 인원 합계와 줄 정원 준수", () => {
+  const r = assignSeats({ soprano: 20, alto: 15, tenor: 8, bass: 10 });
+  assertTrue(r.ok, "ok여야 함");
+  assertEqual(partSum(r.left, "soprano"), 20);
+  assertEqual(partSum(r.left, "alto"), 15);
+  assertEqual(partSum(r.right, "tenor"), 8);
+  assertEqual(partSum(r.right, "bass"), 10);
+  rowTotalsOk(r);
+});
+test("소프라노29+알토17: 둘째 줄 소프라노 1명이 맨 뒷줄로", () => {
+  const r = assignSeats({ soprano: 29, alto: 17, tenor: 0, bass: 0 });
+  assertTrue(r.ok, "ok여야 함");
+  assertEqual(r.left.map(x => x.soprano), [6, 5, 6, 6, 6], "소프라노");
+  assertEqual(r.left.map(x => x.alto), [4, 4, 3, 3, 3], "알토");
+});
+test("소프라노29+알토18: 둘째 줄 1명이 셋째 줄로 (바짝 붙는 1·3·5줄 우선)", () => {
+  const r = assignSeats({ soprano: 29, alto: 18, tenor: 0, bass: 0 });
+  assertTrue(r.ok, "ok여야 함");
+  assertEqual(r.left.map(x => x.soprano), [6, 5, 6, 6, 6], "소프라노");
+  assertEqual(r.left.map(x => x.alto), [4, 4, 4, 3, 3], "알토");
+});
+test("테너11+베이스12: 1줄은 테너2+베이스2", () => {
+  const r = assignSeats({ soprano: 0, alto: 0, tenor: 11, bass: 12 });
+  assertTrue(r.ok, "ok여야 함");
+  assertEqual(r.right[0].bass, 2, "1줄 베이스");
+  assertEqual(r.right[0].tenor, 2, "1줄 테너");
+  assertEqual(partSum(r.right, "bass"), 12);
+  assertEqual(partSum(r.right, "tenor"), 11);
+  rowTotalsOk(r);
+});
+test("반올림으로 줄이 넘치는 경우 재배분 (소프라노31+알토29)", () => {
+  const r = assignSeats({ soprano: 31, alto: 29, tenor: 0, bass: 0 });
+  assertTrue(r.ok, "ok여야 함");
+  assertEqual(partSum(r.left, "soprano"), 31);
+  assertEqual(partSum(r.left, "alto"), 29);
+  rowTotalsOk(r);
+});
+test("오른쪽 블록 만석 (베이스16+테너16)", () => {
+  const r = assignSeats({ soprano: 0, alto: 0, tenor: 16, bass: 16 });
+  assertTrue(r.ok, "ok여야 함");
+  assertEqual(partSum(r.right, "bass"), 16);
+  assertEqual(partSum(r.right, "tenor"), 16);
+  rowTotalsOk(r);
+});
+test("왼쪽 블록 정원 초과는 오류", () => {
+  const r = assignSeats({ soprano: 35, alto: 26, tenor: 0, bass: 0 });
+  assertTrue(!r.ok, "실패해야 함");
+  assertTrue(r.errors.length === 1 && r.errors[0].includes("소프라노"), "오류 문구");
+});
+test("음수·소수 인원은 오류", () => {
+  assertTrue(!assignSeats({ soprano: -1, alto: 0, tenor: 0, bass: 0 }).ok);
+  assertTrue(!assignSeats({ soprano: 1.5, alto: 0, tenor: 0, bass: 0 }).ok);
+});
+test("전원 0명도 정상 동작", () => {
+  const r = assignSeats({ soprano: 0, alto: 0, tenor: 0, bass: 0 });
+  assertTrue(r.ok, "ok여야 함");
+  rowTotalsOk(r);
+});
+
+// 정중앙 팔걸이 기준 숫자
+ test("소프라노3 알토2: 넘어가는 인원 없음", () => assertEqual(sopranoSplit(3,2), {left:3,right:0}));
+ test("소프라노6 알토3: 균형을 위해 1명 넘어감", () => assertEqual(sopranoSplit(6,3), {left:5,right:1}));
+ test("소프라노7 알토3: 균형을 위해 2명 넘어감", () => assertEqual(sopranoSplit(7,3), {left:5,right:2}));
+ test("소프라노12 알토0: 6명 넘어감", () => assertEqual(sopranoSplit(12,0), {left:6,right:6}));
+
+// ---- 결과 출력 ----
+const ul = document.getElementById("results");
+let failCount = 0;
+for (const r of results) {
+  const li = document.createElement("li");
+  li.textContent = (r.pass ? "PASS " : "FAIL ") + r.name + (r.error ? " — " + r.error : "");
+  li.style.color = r.pass ? "green" : "red";
+  if (!r.pass) failCount++;
+  ul.appendChild(li);
+}
+console.log(failCount === 0 ? "ALL TESTS PASSED (" + results.length + ")" : failCount + " TESTS FAILED");
+</script>
+</body>
+</html>
