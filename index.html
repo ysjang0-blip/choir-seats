@@ -107,15 +107,19 @@ function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag,
       const middle = x + w / 2;
       const leftCount = Math.ceil(total / 2);
       const rightCount = total - leftCount;
-      const placeHalf = (lo, hi, count) => {
+      const placeHalf = (lo, hi, count, side) => {
         if (!count) return;
         const span = (count - 1) * blockGap;
-        const offset = zigzag && rowIndex % 2 !== flushParity ? blockGap / 2 : 0;
-        const start = zigzag ? hi - offset - span : (lo + hi - span) / 2;
+        // 1·3·5줄은 왼쪽, 2·4줄은 오른쪽이 중앙에 붙는다.
+        const flush = side === "left" ? rowIndex % 2 === 0 : rowIndex % 2 === 1;
+        const offset = zigzag && !flush ? blockGap / 2 : 0;
+        const start = zigzag
+          ? (side === "left" ? hi - offset - span : lo + offset)
+          : (lo + hi - span) / 2;
         for (let k = 0; k < count; k++) xs.push(start + k * blockGap);
       };
-      placeHalf(x + PAD + R, middle - R - 4, leftCount);
-      placeHalf(middle + R + 4, x + w - PAD - R, rightCount);
+      placeHalf(x + PAD + R, middle - R - 4, leftCount, "left");
+      placeHalf(middle + R + 4, x + w - PAD - R, rightCount, "right");
       s += '<line x1="' + middle + '" y1="' + (y + 4) + '" x2="' + middle + '" y2="' + (y + BENCH_H - 4) + '" stroke="#b8ad99" stroke-width="1" stroke-opacity="0.45"/>';
     } else if (zigzag) {
       // 간격은 블록 전체가 공유(blockGap): 줄마다 간격이 다르면
@@ -188,8 +192,9 @@ function renderChart(result) {
   const halfGapCandidates = leftRows.flatMap(r => {
     const span = (r.cap * SEAT + PAD * 2) / 2 - PAD - R * 2 - 4;
     return [Math.ceil(r.total / 2), Math.floor(r.total / 2)]
-      .filter(n => n > 0).map(n => span / Math.max(1,
-        n - (leftZigzag && r.i % 2 !== 0 ? 0.5 : 1)));
+      .map((n, side) => ({ n, flush: side === 0 ? r.i % 2 === 0 : r.i % 2 === 1 }))
+      .filter(h => h.n > 0).map(h => span / Math.max(1,
+        h.n - (leftZigzag && !h.flush ? 0.5 : 1)));
   });
   const leftGap = halfGapCandidates.length ? Math.min(...halfGapCandidates) : 0;
   const rightGap = gapOf(result.right.map((r, i) => ({ cap: r.capacity, total: r.bass + r.tenor, i })), 1);
