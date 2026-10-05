@@ -61,6 +61,19 @@ function balanceToTargets(a, b, targets) {
   }
 }
 
+// 왼쪽은 각 파트의 인원이 뒤로 갈수록 늘지 않도록 앞줄부터 균등 배분한다.
+function frontFirstLeft(soprano, alto) {
+  const sop = distributeToRows(soprano, LEFT_CAPS);
+  const alt = distributeToRows(alto, LEFT_CAPS);
+  if (sop.every((n, i) => n + alt[i] <= LEFT_CAPS[i])) return [sop, alt];
+
+  // 앞줄 우선이면 첫 줄에는 각 파트 평균의 올림 이상이 필요하다.
+  // 그 합이 12석을 넘는 경우 두 파트 모두 앞줄 우선을 지킬 수 없으므로,
+  // 이때만 정원을 우선해 줄 전체 인원을 앞줄부터 균등하게 맞춘다.
+  balanceToTargets(sop, alt, distributeToRows(soprano + alto, LEFT_CAPS));
+  return [sop, alt];
+}
+
 // 정중앙 팔걸이 양쪽은 각각 6석이다.
 function sopranoSplit(soprano, alto) {
   const left = Math.min(soprano, Math.ceil((soprano + alto) / 2));
@@ -88,9 +101,7 @@ function assignSeats(counts) {
   }
   if (errors.length > 0) return { ok: false, errors };
 
-  const sop = distributeToRows(counts.soprano, LEFT_CAPS);
-  const alto = distributeToRows(counts.alto, LEFT_CAPS);
-  balanceToTargets(sop, alto, fillTargets(counts.soprano + counts.alto, LEFT_CAPS, 0));
+  const [sop, alto] = frontFirstLeft(counts.soprano, counts.alto);
   const bass = distributeToRows(counts.bass, RIGHT_CAPS);
   const tenor = distributeToRows(counts.tenor, RIGHT_CAPS);
   balanceToTargets(bass, tenor, fillTargets(counts.bass + counts.tenor, RIGHT_CAPS, 1));
