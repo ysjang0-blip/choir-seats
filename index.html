@@ -68,10 +68,11 @@
 <div id="chartWrap"></div>
 <p class="note">배치도는 지휘자가 찬양대를 바라본 방향 기준입니다.</p>
 <script src="assign.js"></script>
+<script src="emoji-assets.js"></script>
 <script>
-const COLORS = { soprano: "#E15759", alto: "#EDC948", bass: "#4E79A7", tenor: "#59A14F" };
+const COLORS = { soprano: "#168DDF", alto: "#28854C", bass: "#D83232", tenor: "#7538AA" };
 const NAMES = { soprano: "소프라노", alto: "알토", tenor: "테너", bass: "베이스" };
-const NUM_COLORS = { soprano: "#E15759", alto: "#C9A227", bass: "#4E79A7", tenor: "#59A14F" };
+const NUM_COLORS = { soprano: "#168DDF", alto: "#28854C", bass: "#D83232", tenor: "#7538AA" };
 const SEAT = 38, R = 15, BENCH_H = 46, TOP = 20, PAD = 8;
 const ROW_GAP = 80;                      // 앞뒤 줄 간격: 의자 한 줄(46)보다 넉넉히 벌린다(그 공간에 인원 숫자를 쓴다)
 const CHART_W = 1370, CHART_H = 965;   // 그림 전체 크기 (아래쪽에 큰 글씨 범례 2줄이 들어간다)
@@ -82,8 +83,8 @@ const LEFT_X = 90;                       // 왼쪽 블록 시작 x
 const RIGHT_EDGE = 1280;                 // 오른쪽 블록의 오른쪽 끝 x (90도 수직 변 — 사다리꼴의 직각 쪽)
 const NUM_SIZE = 92;                     // 인원 숫자 크기 (벌려 놓은 앞뒤 공간을 꽉 채움)
 
-function seatCircle(cx, cy, color) {
-  return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${color}" stroke="#00000022"/>`;
+function seatEmoji(cx, cy, part, size = 32) {
+  return `<image data-part="${part}" x="${cx - size / 2}" y="${cy - size / 2}" width="${size}" height="${size}" href="${CHOIR_EMOJI[part]}"/>`;
 }
 // 한 줄: 왼쪽부터 leftN명은 leftPart 색, 나머지는 rightPart 색.
 // 지그재그일 때는 줄 전체를 통째로 옮긴다. 기준은 가운데 통로 쪽(anchor):
@@ -135,7 +136,7 @@ function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag,
       const start = x + w / 2 - span / 2;
       for (let k = 0; k < total; k++) xs.push(start + k * blockGap);
     }
-    xs.forEach((cx, k) => { s += seatCircle(cx, cy, k < leftN ? COLORS[leftPart] : COLORS[rightPart]); });
+    xs.forEach((cx, k) => { s += seatEmoji(cx, cy, k < leftN ? leftPart : rightPart); });
 
     // 의자 아래 빈 공간의 가운데에 숫자를 쓴다.
     const ty = y + BENCH_H + ROW_GAP / 2 + NUM_SIZE * 0.35;
@@ -207,7 +208,7 @@ function renderChart(result) {
   ["soprano", "alto", "bass", "tenor"].forEach((part, i) => {
     const x = 70 + (i % 2) * 460;
     const y = legendY + Math.floor(i / 2) * legendRowGap;
-    s += `<circle cx="${x}" cy="${y}" r="22" fill="${COLORS[part]}"/>`;
+    s += seatEmoji(x, y, part, 52);
     s += `<text x="${x + 40}" y="${y + 19}" font-family="sans-serif" font-size="${LEGEND_SIZE}" fill="#333">${NAMES[part]} ${counts[part]}명</text>`;
   });
   const totalAll = counts.soprano + counts.alto + counts.bass + counts.tenor;
