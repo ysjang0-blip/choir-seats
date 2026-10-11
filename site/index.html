@@ -38,7 +38,7 @@
     box-shadow: 0 16px 40px rgba(105, 81, 45, 0.12), 0 3px 10px rgba(105, 81, 45, 0.05);
   }
   #chartWrap:empty { display: none; }
-  #chartWrap svg { display: block; width: 100%; height: auto; background: #fff; border-radius: 10px; }
+  #chartWrap img { display: block; width: 100%; height: auto; background: #fff; border-radius: 10px; color-scheme: only light; }
   .note { font-size: 12px; color: #6b6356; text-align: center; }
   #kakaoBanner { background: #fff8d6; border: 1px solid #e6d375; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
   #kakaoBanner p { margin: 0 0 10px; font-size: 14px; color: #6b5a12; line-height: 1.5; }
@@ -85,6 +85,7 @@
 <button id="shareBtn" class="action kakao" hidden>카톡으로 공유</button>
 <div id="error"></div>
 <div id="notice"></div>
+<div id="chartSource" hidden aria-hidden="true"></div>
 <div id="chartWrap"></div>
 <p class="note">배치도는 지휘자가 찬양대를 바라본 방향 기준입니다.</p>
 <script src="assign.js?v=20261011-balanced-edge"></script>
@@ -240,23 +241,42 @@ function renderChart(result) {
   return s + `</svg>`;
 }
 
+let chartRevision = 0;
 function runAssign() {
+  const revision = ++chartRevision;
   const num = id => Number(document.getElementById(id).value || 0);
   const result = assignSeats({ soprano: num("soprano"), alto: num("alto"), tenor: num("tenor"), bass: num("bass") });
   const errorEl = document.getElementById("error");
   const wrap = document.getElementById("chartWrap");
+  const source = document.getElementById("chartSource");
   const saveBtn = document.getElementById("saveBtn");
   const shareBtn = document.getElementById("shareBtn");
   document.getElementById("notice").textContent = "";
   if (!result.ok) {
     errorEl.textContent = result.errors.join("\n");
+    source.innerHTML = "";
     wrap.innerHTML = "";
     saveBtn.hidden = true;
     shareBtn.hidden = true;
     return;
   }
   errorEl.textContent = "";
-  wrap.innerHTML = renderChart(result);
+  // 화면에는 PNG를 표시해 브라우저의 강제 다크모드가 SVG 색을 바꾸지 않게 한다.
+  // 저장·공유도 숨겨 둔 원본 SVG의 좌표와 색으로 같은 PNG를 만든다.
+  source.innerHTML = renderChart(result);
+  svgToPngDataUrl().then(dataUrl => {
+    if (revision !== chartRevision) return;
+    const preview = document.createElement("img");
+    preview.src = dataUrl;
+    preview.width = CHART_W * 2;
+    preview.height = CHART_H * 2;
+    preview.alt = `찬양대 자리배치: 소프라노 ${num("soprano")}명, 알토 ${num("alto")}명, 베이스 ${num("bass")}명, 테너 ${num("tenor")}명`;
+    wrap.replaceChildren(preview);
+  }).catch(e => {
+    if (revision !== chartRevision) return;
+    wrap.innerHTML = "";
+    errorEl.textContent = "배치도를 표시하지 못했어요: " + e.message;
+  });
   saveBtn.hidden = false;
   shareBtn.hidden = false;
 }
@@ -279,30 +299,79 @@ document.querySelectorAll(".stepper button").forEach(btn => {
   });
 });
 
-// 화면의 SVG 배치도를 그대로 캔버스에 그린다(저장·공유 공통).
-function svgToCanvas() {
-  return new Promise((resolve, reject) => {
-    const svg = document.getElementById("chart");
-    if (!svg) return reject(new Error("배치도가 없습니다"));
-    const xml = new XMLSerializer().serializeToString(svg);
-    const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.onload = () => {
-      const scale = 2; // 카톡 공유용 고해상도
-      const canvas = document.createElement("canvas");
-      canvas.width = CHART_W * scale;
-      canvas.height = CHART_H * scale;
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      resolve(canvas);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("이미지 변환 실패")); };
-    img.src = url;
-  });
+// PNG 얼굴 이미지를 재사용한다. 로딩 실패는 다음 입력에서 재시도한다.
+const chartImages = new Map();
+function loadChartImage(href) {
+  if (!chartImages.has(href)) {
+    const loading = new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("얼굴 이미지 로딩 실패"));
+      image.src = href;
+    }).catch(error => { chartImages.delete(href); throw error; });
+    chartImages.set(href, loading);
+  }
+  return chartImages.get(href);
+}
+
+// SVG 이미지 디코딩을 거치지 않고 원본 좌표와 색을 직접 그린다.
+// 강제 다크모드의 SVG 색상 변환이 화면·저장 PNG에 섞이지 않게 한다.
+async function svgToCanvas() {
+  const svg = document.getElementById("chart");
+  if (!svg) throw new Error("배치도가 없습니다");
+  const elements = Array.from(svg.children);
+  const images = new Map(await Promise.all(elements.filter(el => el.localName === "image").map(async el => {
+    const href = el.getAttribute("href");
+    return [href, await loadChartImage(href)];
+  })));
+  const scale = 2; // 카톡 공유용 고해상도
+  const canvas = document.createElement("canvas");
+  canvas.width = CHART_W * scale;
+  canvas.height = CHART_H * scale;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("이미지를 그릴 수 없습니다");
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, CHART_W, CHART_H);
+  for (const el of elements) {
+    const attr = (name, fallback = "") => el.getAttribute(name) ?? fallback;
+    const n = name => Number(attr(name, "0"));
+    ctx.save();
+    if (el.localName === "rect") {
+      const x = n("x"), y = n("y"), w = n("width"), h = n("height");
+      const r = Math.min(n("rx"), w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.arcTo(x + w, y, x + w, y + r, r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+      ctx.lineTo(x + r, y + h);
+      ctx.arcTo(x, y + h, x, y + h - r, r);
+      ctx.lineTo(x, y + r);
+      ctx.arcTo(x, y, x + r, y, r);
+      ctx.closePath();
+      if (attr("fill", "#000") !== "none") { ctx.fillStyle = attr("fill", "#000"); ctx.fill(); }
+      if (attr("stroke")) { ctx.strokeStyle = attr("stroke"); ctx.lineWidth = Number(attr("stroke-width", "1")); ctx.stroke(); }
+    } else if (el.localName === "line") {
+      ctx.strokeStyle = attr("stroke", "#000");
+      ctx.lineWidth = Number(attr("stroke-width", "1"));
+      ctx.globalAlpha = Number(attr("stroke-opacity", "1"));
+      ctx.beginPath(); ctx.moveTo(n("x1"), n("y1")); ctx.lineTo(n("x2"), n("y2")); ctx.stroke();
+    } else if (el.localName === "text") {
+      ctx.font = `${attr("font-weight", "normal")} ${n("font-size")}px ${attr("font-family", "sans-serif")}`;
+      ctx.textAlign = { middle: "center", end: "right" }[attr("text-anchor")] || "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = attr("fill", "#000");
+      ctx.fillText(el.textContent, n("x"), n("y"));
+    } else if (el.localName === "image") {
+      ctx.drawImage(images.get(attr("href")), n("x"), n("y"), n("width"), n("height"));
+    } else {
+      throw new Error("지원하지 않는 배치도 요소: " + el.localName);
+    }
+    ctx.restore();
+  }
+  return canvas;
 }
 function svgToPngDataUrl() { return svgToCanvas().then(c => c.toDataURL("image/png")); }
 function svgToPngFile() {

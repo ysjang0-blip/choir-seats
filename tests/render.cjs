@@ -6,20 +6,7 @@ const vm = require('node:vm');
 
 const site = path.join(__dirname, '../site');
 const html = fs.readFileSync(path.join(site, 'index.html'), 'utf8');
-const elements = new Map();
-const getElement = id => {
-  if (!elements.has(id)) elements.set(id, {
-    value: '0', textContent: '', innerHTML: '', hidden: false, addEventListener() {},
-  });
-  return elements.get(id);
-};
-const context = vm.createContext({
-  console, Date, window: {}, navigator: { userAgent: '' },
-  document: { getElementById: getElement, querySelectorAll: () => [] },
-});
-vm.runInContext(fs.readFileSync(path.join(site, 'assign.js'), 'utf8'), context);
-vm.runInContext(fs.readFileSync(path.join(site, 'emoji-assets.js'), 'utf8'), context);
-vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
+const { context } = require('./page-harness.cjs')();
 
 const render = counts => vm.runInContext(`renderChart(assignSeats(${JSON.stringify(counts)}))`, context);
 const images = svg => [...svg.matchAll(/<image data-part="(\w+)" x="([^"]+)" y="([^"]+)" width="32"/g)]

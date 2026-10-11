@@ -15,3 +15,4 @@ const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 vm.runInContext(script, context);
 process.exitCode = vm.runInContext('failCount', context) ? 1 : 0;
 require('./render.cjs');
+require('./preview.cjs').catch(error => { console.error(error); process.exitCode = 1; });
