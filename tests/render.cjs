@@ -42,13 +42,16 @@ for (const [soprano, alto] of [[26,14], [29,17], [32,17], [33,17], [34,17], [0,0
     const left = seats.filter(s => s.y === cy && (s.part === 'soprano' || s.part === 'alto'));
     const n = row.soprano + row.alto;
     assert.equal(left.length, n);
-    assert.equal(left.filter(s => s.x > 326).length, Math.min(n,6), `${soprano}/${alto} ${i+1}줄 오른쪽 우선`);
+    const rightCount = left.filter(s => s.x > 326).length;
+    const leftCount = left.filter(s => s.x < 326).length;
+    assert.equal(rightCount, Math.ceil(n/2), `${soprano}/${alto} ${i+1}줄 좌우 균등`);
+    assert.ok(Math.abs(rightCount - leftCount) <= 1, '좌우 인원 쏠림');
     left.forEach((s,k) => {
       assert.ok(s.x >= 113 - 1e-8 && s.x <= 539 + 1e-8, '의자 밖 좌석');
       assert.ok(s.x <= 307 + 1e-8 || s.x >= 345 - 1e-8, '팔걸이 위 좌석');
       if (k) assert.ok(s.x - left[k-1].x >= 32 - 1e-8, '얼굴 겹침');
     });
-    if (n && (soprano + alto >= 50 || i % 2 === 0)) {
+    if (n) {
       assert.ok(Math.abs(left.at(-1).x - 539) < 1e-8, '오른쪽 끝에 빈자리');
     }
     const crossed = left.filter(s => s.part === 'soprano' && s.x > 326).length;
@@ -61,7 +64,7 @@ for (const [soprano, alto] of [[26,14], [29,17], [32,17], [33,17], [34,17], [0,0
   }
 }
 
-// 모든 가능한 줄 인원에서도 오른쪽 우선과 좌석/팔걸이 범위를 지킨다.
+// 모든 가능한 줄 인원에서도 균등 배분과 좌석/팔걸이 범위를 지킨다.
 for (let total = 0; total <= 60; total++) {
   const svg = render({soprano:total,alto:0,bass:0,tenor:0});
   images(svg).forEach(s => assert.ok(s.x >= 113 - 1e-8 && s.x <= 539 + 1e-8));
