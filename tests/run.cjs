@@ -14,3 +14,4 @@ const html = fs.readFileSync(path.join(__dirname, 'tests.html'), 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 vm.runInContext(script, context);
 process.exitCode = vm.runInContext('failCount', context) ? 1 : 0;
+require('./render.cjs');
