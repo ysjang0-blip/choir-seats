@@ -3,13 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#efe2c9">
 <title>찬양대 자리배치</title>
 <style>
-  body { font-family: "Malgun Gothic", sans-serif; margin: 0 auto; padding: 16px; max-width: 720px; background: #fafafa; }
+  html {
+    min-height: 100%;
+    color-scheme: only light;
+    color: #302d27;
+    background-color: #efe2c9;
+    background-image:
+      radial-gradient(ellipse at 15% 0%, rgba(255, 255, 255, 0.45), transparent 60%),
+      radial-gradient(ellipse at 90% 30%, rgba(255, 218, 160, 0.25), transparent 65%);
+  }
+  body { font-family: "Malgun Gothic", sans-serif; margin: 0 auto; padding: 16px; max-width: 720px; background: transparent; }
   h1 { font-size: 22px; text-align: center; }
   .inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .inputs label { display: flex; flex-direction: column; font-size: 14px; gap: 4px; }
-  .inputs input { font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 8px; width: 100%; box-sizing: border-box; }
+  .inputs input { font-size: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 8px; width: 100%; box-sizing: border-box; background: #fff; color: #302d27; }
   button.action { width: 100%; font-size: 18px; padding: 12px; border: 0; border-radius: 8px; background: #4E79A7; color: #fff; margin-bottom: 8px; cursor: pointer; }
   button.action.secondary { background: #59A14F; }
   button.action.kakao { background: #FEE500; color: #3C1E1E; font-weight: bold; }
@@ -18,8 +29,17 @@
   .stepper button { width: 52px; font-size: 26px; padding: 0; border: 1px solid #ccc; border-radius: 8px; background: #eee; color: #333; cursor: pointer; }
   #error { color: #c0392b; font-weight: bold; white-space: pre-line; margin: 8px 0; }
   #notice { color: #33608f; font-size: 14px; white-space: pre-line; margin: 8px 0; }
-  #chartWrap svg { width: 100%; height: auto; background: #fff; border: 1px solid #eee; border-radius: 8px; }
-  .note { font-size: 12px; color: #888; text-align: center; }
+  /* 화면용 카드 장식: SVG만 변환하는 PNG 저장에는 포함되지 않는다. */
+  #chartWrap {
+    background: #fff;
+    border: 1px solid rgba(174, 151, 115, 0.22);
+    border-radius: 20px;
+    padding: 12px;
+    box-shadow: 0 16px 40px rgba(105, 81, 45, 0.12), 0 3px 10px rgba(105, 81, 45, 0.05);
+  }
+  #chartWrap:empty { display: none; }
+  #chartWrap img { display: block; width: 100%; height: auto; background: #fff; color-scheme: only light; }
+  .note { font-size: 12px; color: #6b6356; text-align: center; }
   #kakaoBanner { background: #fff8d6; border: 1px solid #e6d375; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
   #kakaoBanner p { margin: 0 0 10px; font-size: 14px; color: #6b5a12; line-height: 1.5; }
   #kakaoBanner button { margin-bottom: 0; }
@@ -65,9 +85,10 @@
 <button id="shareBtn" class="action kakao" hidden>카톡으로 공유</button>
 <div id="error"></div>
 <div id="notice"></div>
+<div id="chartSource" hidden aria-hidden="true"></div>
 <div id="chartWrap"></div>
 <p class="note">배치도는 지휘자가 찬양대를 바라본 방향 기준입니다.</p>
-<script src="assign.js"></script>
+<script src="assign.js?v=20261011-balanced-edge"></script>
 <script src="emoji-assets.js?v=20261005-color3"></script>
 <script>
 const COLORS = { soprano: "#168DDF", alto: "#D66A12", bass: "#D83232", tenor: "#292929" };
@@ -76,6 +97,7 @@ const NUM_COLORS = { soprano: "#168DDF", alto: "#D66A12", bass: "#D83232", tenor
 const SEAT = 38, R = 15, BENCH_H = 46, TOP = 20, PAD = 8;
 const ROW_GAP = 80;                      // 앞뒤 줄 간격: 의자 한 줄(46)보다 넉넉히 벌린다(그 공간에 인원 숫자를 쓴다)
 const CHART_W = 1370, CHART_H = 965;   // 그림 전체 크기 (아래쪽에 큰 글씨 범례 2줄이 들어간다)
+const PAPER_COLOR = "#fffaf4";
 const LABEL_SIZE = 45;                   // "▼ 앞 (지휘자석)" 글자 크기 (18 → 2.5배)
 const LEGEND_SIZE = 55;                  // 파트 이름 글자 크기 (22 → 2.5배)
 const TOTAL_SIZE = 72;                   // 총원 글자 크기 (파트 이름보다 크게)
@@ -87,14 +109,14 @@ function seatEmoji(cx, cy, part, size = 32) {
   return `<image data-part="${part}" x="${cx - size / 2}" y="${cy - size / 2}" width="${size}" height="${size}" href="${CHOIR_EMOJI[part]}"/>`;
 }
 // 한 줄: 왼쪽부터 leftN명은 leftPart 색, 나머지는 rightPart 색.
-// 지그재그일 때는 줄 전체를 통째로 옮긴다. 기준은 가운데 통로 쪽(anchor):
-// 1·3·5번째 줄은 가운데 쪽 끝에 바짝 붙고(반대쪽 끝은 띄워짐),
-// 2·4번째 줄은 반 칸 물러나 앞줄과 엇갈린다.
-// 지그재그가 아니면(일렬) 모든 줄이 같은 간격으로 놓이고 각 줄을 의자 가운데에 맞춘다.
+// 왼쪽 블록은 팔걸이 양쪽 인원을 균등하게 나눈다(차이는 최대 1명).
+// 양쪽 반줄은 팔걸이를 기준으로 번갈아 반 칸 이동해 지그재그를 유지한다.
+// 오른쪽은 1·3·5줄, 왼쪽은 2·4줄이 팔걸이에 붙는다.
+// 50명 이상은 지그재그 이동 없이 정렬한다.
 // blockGap은 지그재그일 때는 지그재그 간격, 일렬일 때는 일렬 간격이다.
 // 인원 숫자는 의자 바로 아래(앞뒤로 벌려 놓은 빈 공간)에 쓴다.
 //  - 왼쪽 블록(leftBlock): 맨 오른쪽 끝에 알토 인원,
-//    소프라노 자리의 오른쪽 끝에 알토 자리로 넘어온 소프라노(5-알토), 왼쪽 끝에 나머지 소프라노
+//    중앙에 팔걸이 오른쪽으로 넘어온 소프라노, 왼쪽 끝에 나머지 소프라노
 //  - 오른쪽 블록: 왼쪽 끝에 베이스 인원, 오른쪽 끝에 테너 인원
 function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag, anchor, blockGap, flushParity, leftBlock) {
   const w = cap * SEAT + PAD * 2;
@@ -105,28 +127,26 @@ function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag,
     const xs = [];
     if (leftBlock) {
       const middle = x + w / 2;
-      const leftCount = Math.ceil(total / 2);
-      const rightCount = total - leftCount;
+      const split = leftSeatSplit(total);
       const placeHalf = (lo, hi, count, side) => {
         if (!count) return;
         const span = (count - 1) * blockGap;
-        // 1·3·5줄은 왼쪽, 2·4줄은 오른쪽이 중앙에 붙는다.
-        const flush = side === "left" ? rowIndex % 2 === 0 : rowIndex % 2 === 1;
+        const flush = side === "left" ? rowIndex % 2 === flushParity : rowIndex % 2 !== flushParity;
         const offset = zigzag && !flush ? blockGap / 2 : 0;
         const start = zigzag
           ? (side === "left" ? hi - offset - span : lo + offset)
           : (lo + hi - span) / 2;
         for (let k = 0; k < count; k++) xs.push(start + k * blockGap);
       };
-      placeHalf(x + PAD + R, middle - R - 4, leftCount, "left");
-      placeHalf(middle + R + 4, x + w - PAD - R, rightCount, "right");
+      placeHalf(x + PAD + R, middle - R - 4, split.left, "left");
+      placeHalf(middle + R + 4, x + w - PAD - R, split.right, "right");
       s += '<line x1="' + middle + '" y1="' + (y + 4) + '" x2="' + middle + '" y2="' + (y + BENCH_H - 4) + '" stroke="#b8ad99" stroke-width="1" stroke-opacity="0.45"/>';
     } else if (zigzag) {
       // 간격은 블록 전체가 공유(blockGap): 줄마다 간격이 다르면
       // 인원이 다른 줄끼리 지그재그가 어긋나므로 같은 격자 위에 놓는다.
       const gap = blockGap;
       // flushParity와 홀짝이 같은 줄이 anchor 쪽 끝에 바짝 붙고, 나머지는 반 칸 안쪽
-      // (왼쪽 블록: 1·3·5줄이 오른쪽 끝, 오른쪽 블록: 2·4줄이 오른쪽 끝)
+      // 베이스·테너 블록은 2·4줄이 오른쪽 끝에 붙는다.
       const offset = rowIndex % 2 === flushParity ? 0 : gap / 2;
       for (let k = 0; k < total; k++) {
         if (anchor === "right") xs.push(x + w - PAD - R - offset - (total - 1 - k) * gap);
@@ -181,30 +201,27 @@ function renderChart(result) {
       .map(r => (r.cap * SEAT - R * 2) / Math.max(r.total - (r.i % 2 === flushParity ? 1 : 0.5), 1.5));
     return cands.length ? Math.min(...cands) : 0;
   };
-  // 일렬일 때의 블록 공통 간격: 가장 인원이 많은 줄이 의자를 끝에서 끝까지 채우는 값.
-  // 인원이 적은 줄도 같은 간격을 쓰고 가운데 정렬하므로 줄끼리 간격이 어긋나지 않는다.
-  const straightGapOf = rows => {
-    const cands = rows.filter(r => r.total > 1).map(r => (r.cap * SEAT - R * 2) / (r.total - 1));
-    return cands.length ? Math.min(...cands) : 0;
-  };
   const leftRows = result.left.map((r, i) => ({ cap: r.capacity, total: r.soprano + r.alto, i }));
-  // 팔걸이 양쪽에서도 모든 줄이 같은 격자를 공유한다.
+  const leftFlushParity = 1; // 여성 파트: 왼쪽은 2·4줄, 오른쪽은 1·3·5줄이 중앙에 붙는다.
+  // 좌우에 균등 배분한 인원으로 공통 간격을 계산한다.
+  // 양쪽 반줄의 지그재그 이동까지 포함해 공통 간격을 계산한다.
   const halfGapCandidates = leftRows.flatMap(r => {
     const span = (r.cap * SEAT + PAD * 2) / 2 - PAD - R * 2 - 4;
-    return [Math.ceil(r.total / 2), Math.floor(r.total / 2)]
-      .map((n, side) => ({ n, flush: side === 0 ? r.i % 2 === 0 : r.i % 2 === 1 }))
-      .filter(h => h.n > 0).map(h => span / Math.max(1,
-        h.n - (leftZigzag && !h.flush ? 0.5 : 1)));
+    const split = leftSeatSplit(r.total);
+    return [
+      { n: split.left, offset: leftZigzag && r.i % 2 !== leftFlushParity ? 0.5 : 0 },
+      { n: split.right, offset: leftZigzag && r.i % 2 === leftFlushParity ? 0.5 : 0 }
+    ].filter(h => h.n > 0).map(h => span / Math.max(1, h.n - 1 + h.offset));
   });
   const leftGap = halfGapCandidates.length ? Math.min(...halfGapCandidates) : 0;
   const rightGap = gapOf(result.right.map((r, i) => ({ cap: r.capacity, total: r.bass + r.tenor, i })), 1);
   let s = `<svg id="chart" xmlns="http://www.w3.org/2000/svg" width="${CHART_W}" height="${CHART_H}" viewBox="0 0 ${CHART_W} ${CHART_H}">`;
-  s += `<rect x="0" y="0" width="${CHART_W}" height="${CHART_H}" fill="#ffffff"/>`;
+  s += `<rect x="0" y="0" width="${CHART_W}" height="${CHART_H}" fill="${PAPER_COLOR}"/>`;
   s += `<text x="${CHART_W / 2}" y="705" text-anchor="middle" font-family="sans-serif" font-size="${LABEL_SIZE}" fill="#666">▲ 앞 (지휘자석) · 지휘자가 바라본 방향</text>`;
   // 맨 앞줄(1줄)이 그림 아래쪽: 지휘자(맨 앞)가 바라본 모습 그대로
   result.left.forEach((row, i) => {
     const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
-    s += rowSvg(LEFT_X, y, row.capacity, "soprano", row.soprano, "alto", row.alto, i, leftZigzag, "right", leftGap, 0, true);
+    s += rowSvg(LEFT_X, y, row.capacity, "soprano", row.soprano, "alto", row.alto, i, leftZigzag, "right", leftGap, leftFlushParity, true);
   });
   // 오른쪽 블록: 오른쪽 끝을 수직으로 맞추고(90도), 의자가 뒤로 갈수록 길어져 왼쪽이 사선인 사다리꼴.
   // 사람은 오른쪽 끝 기준으로 앉히되 2·4줄이 끝에 바짝 붙는다.
@@ -229,23 +246,42 @@ function renderChart(result) {
   return s + `</svg>`;
 }
 
+let chartRevision = 0;
 function runAssign() {
+  const revision = ++chartRevision;
   const num = id => Number(document.getElementById(id).value || 0);
   const result = assignSeats({ soprano: num("soprano"), alto: num("alto"), tenor: num("tenor"), bass: num("bass") });
   const errorEl = document.getElementById("error");
   const wrap = document.getElementById("chartWrap");
+  const source = document.getElementById("chartSource");
   const saveBtn = document.getElementById("saveBtn");
   const shareBtn = document.getElementById("shareBtn");
   document.getElementById("notice").textContent = "";
   if (!result.ok) {
     errorEl.textContent = result.errors.join("\n");
+    source.innerHTML = "";
     wrap.innerHTML = "";
     saveBtn.hidden = true;
     shareBtn.hidden = true;
     return;
   }
   errorEl.textContent = "";
-  wrap.innerHTML = renderChart(result);
+  // 화면에는 PNG를 표시해 브라우저의 강제 다크모드가 SVG 색을 바꾸지 않게 한다.
+  // 저장·공유도 숨겨 둔 원본 SVG의 좌표와 색으로 같은 PNG를 만든다.
+  source.innerHTML = renderChart(result);
+  svgToPngDataUrl().then(dataUrl => {
+    if (revision !== chartRevision) return;
+    const preview = document.createElement("img");
+    preview.src = dataUrl;
+    preview.width = CHART_W * 2;
+    preview.height = CHART_H * 2;
+    preview.alt = `찬양대 자리배치: 소프라노 ${num("soprano")}명, 알토 ${num("alto")}명, 베이스 ${num("bass")}명, 테너 ${num("tenor")}명`;
+    wrap.replaceChildren(preview);
+  }).catch(e => {
+    if (revision !== chartRevision) return;
+    wrap.innerHTML = "";
+    errorEl.textContent = "배치도를 표시하지 못했어요: " + e.message;
+  });
   saveBtn.hidden = false;
   shareBtn.hidden = false;
 }
@@ -268,30 +304,167 @@ document.querySelectorAll(".stepper button").forEach(btn => {
   });
 });
 
-// 화면의 SVG 배치도를 그대로 캔버스에 그린다(저장·공유 공통).
-function svgToCanvas() {
-  return new Promise((resolve, reject) => {
-    const svg = document.getElementById("chart");
-    if (!svg) return reject(new Error("배치도가 없습니다"));
-    const xml = new XMLSerializer().serializeToString(svg);
-    const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.onload = () => {
-      const scale = 2; // 카톡 공유용 고해상도
-      const canvas = document.createElement("canvas");
-      canvas.width = CHART_W * scale;
-      canvas.height = CHART_H * scale;
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      resolve(canvas);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("이미지 변환 실패")); };
-    img.src = url;
-  });
+// PNG 얼굴 이미지를 재사용한다. 로딩 실패는 다음 입력에서 재시도한다.
+const chartImages = new Map();
+function loadChartImage(href) {
+  if (!chartImages.has(href)) {
+    const loading = new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("얼굴 이미지 로딩 실패"));
+      image.src = href;
+    }).catch(error => { chartImages.delete(href); throw error; });
+    chartImages.set(href, loading);
+  }
+  return chartImages.get(href);
+}
+
+// 휴대폰에서도 보이도록 금색 띠에 밝고 어두운 선과 장식무늬를 더한다.
+function drawChartFrame(ctx) {
+  ctx.save();
+  ctx.strokeStyle = "#c89b45";
+  ctx.lineWidth = 12;
+  ctx.strokeRect(10, 10, CHART_W - 20, CHART_H - 20);
+  ctx.strokeStyle = "#835c22";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(3.5, 3.5, CHART_W - 7, CHART_H - 7);
+  ctx.strokeStyle = "#f3d990";
+  ctx.lineWidth = 2.2;
+  ctx.strokeRect(10, 10, CHART_W - 20, CHART_H - 20);
+  ctx.strokeStyle = "#9f752e";
+  ctx.lineWidth = 1.8;
+  ctx.strokeRect(18, 18, CHART_W - 36, CHART_H - 36);
+
+  const diamond = (x, y, size) => {
+    ctx.beginPath();
+    ctx.moveTo(x, y - size); ctx.lineTo(x + size, y);
+    ctx.lineTo(x, y + size); ctx.lineTo(x - size, y);
+    ctx.closePath(); ctx.fill();
+  };
+  ctx.fillStyle = "#835c22";
+  // 금색 띠의 반복무늬는 좌석·글자 바깥 여백에만 둔다.
+  for (let x = 70; x < CHART_W - 50; x += 70) {
+    if (Math.abs(x - CHART_W / 2) < 85) continue; // 중앙 장식을 위한 공간
+    diamond(x, 10, 3.4); diamond(x, CHART_H - 10, 3.4);
+  }
+  for (let y = 70; y < CHART_H - 50; y += 70) {
+    diamond(10, y, 3.4); diamond(CHART_W - 10, y, 3.4);
+  }
+  const corner = (x, y, dx, dy) => {
+    const point = (a, b) => [x + a * dx * 1.3, y + b * dy * 1.3];
+    ctx.beginPath();
+    ctx.moveTo(...point(0, 38));
+    ctx.bezierCurveTo(...point(0, 16), ...point(16, 0), ...point(38, 0));
+    ctx.moveTo(...point(7, 30));
+    ctx.bezierCurveTo(...point(7, 15), ...point(15, 7), ...point(30, 7));
+    ctx.moveTo(...point(6, 25));
+    ctx.bezierCurveTo(...point(22, 25), ...point(26, 12), ...point(18, 11));
+    ctx.bezierCurveTo(...point(9, 10), ...point(7, 19), ...point(17, 19));
+    ctx.moveTo(...point(9, 36));
+    ctx.bezierCurveTo(...point(24, 38), ...point(39, 27), ...point(36, 17));
+    ctx.bezierCurveTo(...point(34, 9), ...point(25, 8), ...point(23, 15));
+    ctx.bezierCurveTo(...point(21, 23), ...point(33, 26), ...point(36, 17));
+    ctx.stroke();
+    diamond(...point(22, 22), 4);
+    ctx.fillStyle = "#c89b45";
+    ctx.beginPath(); ctx.moveTo(...point(11, 35));
+    ctx.bezierCurveTo(...point(12, 24), ...point(21, 27), ...point(25, 23));
+    ctx.bezierCurveTo(...point(24, 35), ...point(18, 38), ...point(11, 35));
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(...point(35, 11));
+    ctx.bezierCurveTo(...point(24, 12), ...point(27, 21), ...point(23, 25));
+    ctx.bezierCurveTo(...point(35, 24), ...point(38, 18), ...point(35, 11));
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#835c22";
+  };
+  ctx.strokeStyle = "#9f752e";
+  ctx.lineWidth = 2.1;
+  corner(12, 12, 1, 1); corner(CHART_W - 12, 12, -1, 1);
+  corner(12, CHART_H - 12, 1, -1); corner(CHART_W - 12, CHART_H - 12, -1, -1);
+  // 상하 중앙의 대칭 덩굴 장식은 배치도와 범례가 없는 여백에 놓는다.
+  const centerpiece = (y, dy) => {
+    const x = CHART_W / 2;
+    ctx.strokeStyle = "#9f752e";
+    ctx.lineWidth = 2.2;
+    for (const side of [-1, 1]) {
+      const point = (a, b) => [x + a * side, y + b * dy];
+      ctx.beginPath(); ctx.moveTo(...point(72, 0));
+      ctx.bezierCurveTo(...point(56, 13), ...point(28, 10), ...point(9, 18));
+      ctx.bezierCurveTo(...point(25, 18), ...point(41, 27), ...point(50, 16));
+      ctx.bezierCurveTo(...point(56, 11), ...point(53, 4), ...point(44, 8));
+      ctx.stroke();
+      ctx.fillStyle = "#c89b45";
+      ctx.beginPath(); ctx.moveTo(...point(24, 12));
+      ctx.bezierCurveTo(...point(29, 2), ...point(41, 5), ...point(47, 2));
+      ctx.bezierCurveTo(...point(43, 13), ...point(32, 17), ...point(24, 12));
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = "#9f752e"; diamond(x, y + 18 * dy, 6);
+    ctx.fillStyle = "#f3d990"; diamond(x, y + 18 * dy, 2.6);
+  };
+  centerpiece(10, 1); centerpiece(CHART_H - 10, -1);
+  ctx.restore();
+}
+
+// SVG 이미지 디코딩을 거치지 않고 원본 좌표와 색을 직접 그린다.
+// 강제 다크모드의 SVG 색상 변환이 화면·저장 PNG에 섞이지 않게 한다.
+async function svgToCanvas() {
+  const svg = document.getElementById("chart");
+  if (!svg) throw new Error("배치도가 없습니다");
+  const elements = Array.from(svg.children);
+  const images = new Map(await Promise.all(elements.filter(el => el.localName === "image").map(async el => {
+    const href = el.getAttribute("href");
+    return [href, await loadChartImage(href)];
+  })));
+  const scale = 2; // 카톡 공유용 고해상도
+  const canvas = document.createElement("canvas");
+  canvas.width = CHART_W * scale;
+  canvas.height = CHART_H * scale;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("이미지를 그릴 수 없습니다");
+  ctx.scale(scale, scale);
+  ctx.fillStyle = PAPER_COLOR;
+  ctx.fillRect(0, 0, CHART_W, CHART_H);
+  for (const el of elements) {
+    const attr = (name, fallback = "") => el.getAttribute(name) ?? fallback;
+    const n = name => Number(attr(name, "0"));
+    ctx.save();
+    if (el.localName === "rect") {
+      const x = n("x"), y = n("y"), w = n("width"), h = n("height");
+      const r = Math.min(n("rx"), w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.arcTo(x + w, y, x + w, y + r, r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+      ctx.lineTo(x + r, y + h);
+      ctx.arcTo(x, y + h, x, y + h - r, r);
+      ctx.lineTo(x, y + r);
+      ctx.arcTo(x, y, x + r, y, r);
+      ctx.closePath();
+      if (attr("fill", "#000") !== "none") { ctx.fillStyle = attr("fill", "#000"); ctx.fill(); }
+      if (attr("stroke")) { ctx.strokeStyle = attr("stroke"); ctx.lineWidth = Number(attr("stroke-width", "1")); ctx.stroke(); }
+    } else if (el.localName === "line") {
+      ctx.strokeStyle = attr("stroke", "#000");
+      ctx.lineWidth = Number(attr("stroke-width", "1"));
+      ctx.globalAlpha = Number(attr("stroke-opacity", "1"));
+      ctx.beginPath(); ctx.moveTo(n("x1"), n("y1")); ctx.lineTo(n("x2"), n("y2")); ctx.stroke();
+    } else if (el.localName === "text") {
+      ctx.font = `${attr("font-weight", "normal")} ${n("font-size")}px ${attr("font-family", "sans-serif")}`;
+      ctx.textAlign = { middle: "center", end: "right" }[attr("text-anchor")] || "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = attr("fill", "#000");
+      ctx.fillText(el.textContent, n("x"), n("y"));
+    } else if (el.localName === "image") {
+      ctx.drawImage(images.get(attr("href")), n("x"), n("y"), n("width"), n("height"));
+    } else {
+      throw new Error("지원하지 않는 배치도 요소: " + el.localName);
+    }
+    ctx.restore();
+  }
+  drawChartFrame(ctx);
+  return canvas;
 }
 function svgToPngDataUrl() { return svgToCanvas().then(c => c.toDataURL("image/png")); }
 function svgToPngFile() {

@@ -131,11 +131,33 @@ test("전원 0명도 정상 동작", () => {
   rowTotalsOk(r);
 });
 
-// 정중앙 팔걸이 기준 숫자
- test("소프라노3 알토2: 넘어가는 인원 없음", () => assertEqual(sopranoSplit(3,2), {left:3,right:0}));
- test("소프라노6 알토3: 균형을 위해 1명 넘어감", () => assertEqual(sopranoSplit(6,3), {left:5,right:1}));
- test("소프라노7 알토3: 균형을 위해 2명 넘어감", () => assertEqual(sopranoSplit(7,3), {left:5,right:2}));
+// 좌우 균등 배치와 실제 팔걸이 기준 숫자
+ test("소프라노3 알토2: 좌우2/3명, 오른쪽 소프라노1명", () => assertEqual(sopranoSplit(3,2), {left:2,right:1}));
+ test("소프라노6 알토3: 좌우4/5명, 오른쪽 소프라노2명", () => assertEqual(sopranoSplit(6,3), {left:4,right:2}));
+ test("소프라노7 알토3: 좌우5/5명, 오른쪽 소프라노2명", () => assertEqual(sopranoSplit(7,3), {left:5,right:2}));
  test("소프라노12 알토0: 6명 넘어감", () => assertEqual(sopranoSplit(12,0), {left:6,right:6}));
+ test("소프라노26 알토14: 좌우 균등 배분과 파트별 앞줄 인원 유지", () => {
+   const r = assignSeats({soprano:26, alto:14, bass:11, tenor:12});
+   assertEqual(r.left.map(row => row.soprano), [6,5,5,5,5]);
+   assertEqual(r.left.map(row => row.alto), [3,3,3,3,2]);
+   assertEqual(r.left.map(row => leftSeatSplit(row.soprano + row.alto)), [
+     {left:4,right:5}, {left:4,right:4}, {left:4,right:4}, {left:4,right:4}, {left:3,right:4}
+   ]);
+   assertEqual(r.left.map(row => sopranoSplit(row.soprano,row.alto).right), [2,1,1,1,2]);
+ });
+ test("모든 줄 인원과 파트 조합: 좌우 차이 최대1명·6석 정원·팔걸이 숫자 일치", () => {
+   for (let total = 0; total <= 12; total++) {
+     const split = leftSeatSplit(total);
+     assertEqual(split.left + split.right, total);
+     assertTrue(split.left <= 6 && split.right <= 6);
+     assertTrue(split.right - split.left >= 0 && split.right - split.left <= 1);
+     for (let soprano = 0; soprano <= total; soprano++) {
+       const counts = sopranoSplit(soprano, total-soprano);
+       assertEqual(counts.left + counts.right, soprano);
+       assertTrue(counts.left <= split.left && counts.right <= split.right);
+     }
+   }
+ });
 
 // ---- 결과 출력 ----
 const ul = document.getElementById("results");

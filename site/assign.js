@@ -74,9 +74,15 @@ function frontFirstLeft(soprano, alto) {
   return [sop, alt];
 }
 
-// 정중앙 팔걸이 양쪽은 각각 6석이다.
+// 팔걸이 양쪽에 균등 배분한다. 홀수일 때만 오른쪽에 1명 더 앉힌다.
+function leftSeatSplit(total) {
+  const right = Math.ceil(total / 2);
+  return { left: total - right, right };
+}
+
+// 소프라노는 왼쪽, 알토는 오른쪽 순서를 유지하며 실제 팔걸이 위치로 나눈다.
 function sopranoSplit(soprano, alto) {
-  const left = Math.min(soprano, Math.ceil((soprano + alto) / 2));
+  const left = Math.min(soprano, leftSeatSplit(soprano + alto).left);
   return { left, right: soprano - left };
 }
 
@@ -114,5 +120,5 @@ function assignSeats(counts) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { LEFT_CAPS, RIGHT_CAPS, distributeToRows, fillTargets, balanceToTargets, sopranoSplit, assignSeats };
+  module.exports = { LEFT_CAPS, RIGHT_CAPS, distributeToRows, fillTargets, balanceToTargets, leftSeatSplit, sopranoSplit, assignSeats };
 }
