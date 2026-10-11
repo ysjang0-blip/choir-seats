@@ -24,6 +24,7 @@ for (const [soprano, alto] of [[26,14], [29,17], [32,17], [33,17], [34,17], [0,0
   assert.equal(seats.filter(s => s.part === 'bass').length, 11);
   assert.equal(seats.filter(s => s.part === 'tenor').length, 12);
   const rows = JSON.parse(vm.runInContext(`JSON.stringify(assignSeats(${JSON.stringify(counts)}).left)`, context));
+  const halfRows = [];
   rows.forEach((row, i) => {
     const cy = 20 + (4-i) * 126 + 23;
     const left = seats.filter(s => s.y === cy && (s.part === 'soprano' || s.part === 'alto'));
@@ -38,13 +39,31 @@ for (const [soprano, alto] of [[26,14], [29,17], [32,17], [33,17], [34,17], [0,0
       assert.ok(s.x <= 307 + 1e-8 || s.x >= 345 - 1e-8, '팔걸이 위 좌석');
       if (k) assert.ok(s.x - left[k-1].x >= 32 - 1e-8, '얼굴 겹침');
     });
-    if (n) {
-      assert.ok(Math.abs(left.at(-1).x - 539) < 1e-8, '오른쪽 끝에 빈자리');
-    }
+    halfRows.push({left:left.filter(s => s.x < 326),right:left.filter(s => s.x > 326)});
     const crossed = left.filter(s => s.part === 'soprano' && s.x > 326).length;
     const centralText = [...svg.matchAll(/<text x="326" y="([^"]+)" text-anchor="middle"[^>]*>(\d+)<\/text>/g)]
       .find(([, y]) => Math.abs(Number(y) - (20 + (4-i)*126 + 46 + 40 + 92*0.35)) < 1e-8);
     assert.equal(centralText ? Number(centralText[2]) : 0, crossed, '팔걸이 오른쪽 소프라노 숫자');
+  });
+  const gapRow = halfRows.flatMap(row => [row.left,row.right]).find(half => half.length > 1);
+  const gap = gapRow ? gapRow[1].x - gapRow[0].x : null;
+  halfRows.forEach((row, i) => {
+    for (const [side, half] of Object.entries(row)) {
+      if (!half.length) continue;
+      for (let k=1; k<half.length; k++) assert.ok(Math.abs(half[k].x-half[k-1].x-gap)<1e-8, '양쪽 반줄 공통 간격');
+      if (soprano + alto < 50) {
+        if (side === 'left' && i % 2 === 0) assert.ok(Math.abs(half.at(-1).x-307)<1e-8, '왼쪽 홀수 줄은 중앙 경계에 붙음');
+        if (side === 'right' && i % 2 === 1) assert.ok(Math.abs(half[0].x-345)<1e-8, '오른쪽 짝수 줄은 중앙 경계에 붙음');
+        if (gap !== null) {
+          const offset=side==='left' ? 307-half.at(-1).x : half[0].x-345;
+          const shifted=side==='left' ? i%2===1 : i%2===0;
+          assert.ok(Math.abs(offset-(shifted?gap/2:0))<1e-8, `${side} ${i+1}줄 반 칸 지그재그`);
+        }
+      } else {
+        const center=side==='left'?210:442;
+        assert.ok(Math.abs((half[0].x+half.at(-1).x)/2-center)<1e-8, '50명 이상은 반줄 가운데 정렬');
+      }
+    }
   });
   if (soprano === 26 && alto === 14 && process.env.CHOIR_PREVIEW_PATH) {
     fs.writeFileSync(process.env.CHOIR_PREVIEW_PATH, svg);
@@ -64,4 +83,4 @@ assert.match(html, /\.inputs input\s*\{[^}]*background:\s*#fff;[^}]*color:\s*#30
 assert.match(html, /const scale = 2;/);
 assert.match(html, /canvas\.width = CHART_W \* scale;/);
 assert.match(html, /canvas\.height = CHART_H \* scale;/);
-console.log('SVG RENDER CHECKS PASSED (26/14, 29/17, 49/50/51, bounds, part counts, labels, PNG format)');
+console.log('SVG RENDER CHECKS PASSED (26/14, 29/17, 49/50/51, bilateral zigzag, bounds, part counts, boundary labels, PNG format)');
