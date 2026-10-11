@@ -5,7 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>찬양대 자리배치</title>
 <style>
-  body { font-family: "Malgun Gothic", sans-serif; margin: 0 auto; padding: 16px; max-width: 720px; background: #fafafa; }
+  html {
+    min-height: 100%;
+    background-color: #efe2c9;
+    background-image:
+      radial-gradient(ellipse at 15% 0%, rgba(255, 255, 255, 0.45), transparent 60%),
+      radial-gradient(ellipse at 90% 30%, rgba(255, 218, 160, 0.25), transparent 65%);
+  }
+  body { font-family: "Malgun Gothic", sans-serif; margin: 0 auto; padding: 16px; max-width: 720px; background: transparent; }
   h1 { font-size: 22px; text-align: center; }
   .inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .inputs label { display: flex; flex-direction: column; font-size: 14px; gap: 4px; }
@@ -18,7 +25,16 @@
   .stepper button { width: 52px; font-size: 26px; padding: 0; border: 1px solid #ccc; border-radius: 8px; background: #eee; color: #333; cursor: pointer; }
   #error { color: #c0392b; font-weight: bold; white-space: pre-line; margin: 8px 0; }
   #notice { color: #33608f; font-size: 14px; white-space: pre-line; margin: 8px 0; }
-  #chartWrap svg { width: 100%; height: auto; background: #fff; border: 1px solid #eee; border-radius: 8px; }
+  /* 화면용 카드 장식: SVG만 변환하는 PNG 저장에는 포함되지 않는다. */
+  #chartWrap {
+    background: #fff;
+    border: 1px solid rgba(174, 151, 115, 0.22);
+    border-radius: 20px;
+    padding: 12px;
+    box-shadow: 0 16px 40px rgba(105, 81, 45, 0.12), 0 3px 10px rgba(105, 81, 45, 0.05);
+  }
+  #chartWrap:empty { display: none; }
+  #chartWrap svg { display: block; width: 100%; height: auto; background: #fff; border-radius: 10px; }
   .note { font-size: 12px; color: #888; text-align: center; }
   #kakaoBanner { background: #fff8d6; border: 1px solid #e6d375; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
   #kakaoBanner p { margin: 0 0 10px; font-size: 14px; color: #6b5a12; line-height: 1.5; }
