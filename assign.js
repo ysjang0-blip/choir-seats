@@ -74,9 +74,9 @@ function frontFirstLeft(soprano, alto) {
   return [sop, alt];
 }
 
-// 정중앙 팔걸이 양쪽은 각각 6석이다. 통로 쪽인 오른쪽 6석을 먼저 채운다.
+// 팔걸이 양쪽에 균등 배분한다. 홀수일 때만 오른쪽에 1명 더 앉힌다.
 function leftSeatSplit(total) {
-  const right = Math.min(total, 6);
+  const right = Math.ceil(total / 2);
   return { left: total - right, right };
 }
 

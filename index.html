@@ -87,7 +87,7 @@
 <div id="notice"></div>
 <div id="chartWrap"></div>
 <p class="note">배치도는 지휘자가 찬양대를 바라본 방향 기준입니다.</p>
-<script src="assign.js?v=20261011-right-first"></script>
+<script src="assign.js?v=20261011-balanced-edge"></script>
 <script src="emoji-assets.js?v=20261005-color3"></script>
 <script>
 const COLORS = { soprano: "#168DDF", alto: "#D66A12", bass: "#D83232", tenor: "#292929" };
@@ -107,10 +107,10 @@ function seatEmoji(cx, cy, part, size = 32) {
   return `<image data-part="${part}" x="${cx - size / 2}" y="${cy - size / 2}" width="${size}" height="${size}" href="${CHOIR_EMOJI[part]}"/>`;
 }
 // 한 줄: 왼쪽부터 leftN명은 leftPart 색, 나머지는 rightPart 색.
-// 왼쪽 블록은 팔걸이 오른쪽 6석부터 채우고, 나머지는 왼쪽에 앉힌다.
-// 양쪽 반줄 모두 오른쪽 끝을 기준으로 배치해 빈자리를 왼쪽에 모은다.
-// 1·3·5줄은 오른쪽 끝에 붙고 2·4줄은 반 칸 물러나 지그재그를 유지한다.
-// 50명 이상은 지그재그 이동 없이 같은 오른쪽 기준에 맞춘다.
+// 왼쪽 블록은 팔걸이 양쪽 인원을 균등하게 나눈다(차이는 최대 1명).
+// 오른쪽 반줄은 바깥쪽 끝에 맞춰 통로 쪽 빈자리가 도드라지지 않게 한다.
+// 왼쪽 반줄은 팔걸이 기준으로 1·3·5줄이 붙고 2·4줄은 반 칸 물러난다.
+// 50명 이상은 지그재그 이동 없이 정렬한다.
 // blockGap은 지그재그일 때는 지그재그 간격, 일렬일 때는 일렬 간격이다.
 // 인원 숫자는 의자 바로 아래(앞뒤로 벌려 놓은 빈 공간)에 쓴다.
 //  - 왼쪽 블록(leftBlock): 맨 오른쪽 끝에 알토 인원,
@@ -126,14 +126,14 @@ function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag,
     if (leftBlock) {
       const middle = x + w / 2;
       const split = leftSeatSplit(total);
-      const offset = zigzag && rowIndex % 2 !== flushParity ? blockGap / 2 : 0;
-      const placeHalf = (hi, count) => {
+      const leftOffset = zigzag && rowIndex % 2 !== flushParity ? blockGap / 2 : 0;
+      const placeHalf = (hi, count, offset = 0) => {
         if (!count) return;
         const span = (count - 1) * blockGap;
         const start = hi - offset - span;
         for (let k = 0; k < count; k++) xs.push(start + k * blockGap);
       };
-      placeHalf(middle - R - 4, split.left);
+      placeHalf(middle - R - 4, split.left, leftOffset);
       placeHalf(x + w - PAD - R, split.right);
       s += '<line x1="' + middle + '" y1="' + (y + 4) + '" x2="' + middle + '" y2="' + (y + BENCH_H - 4) + '" stroke="#b8ad99" stroke-width="1" stroke-opacity="0.45"/>';
     } else if (zigzag) {
@@ -197,14 +197,15 @@ function renderChart(result) {
     return cands.length ? Math.min(...cands) : 0;
   };
   const leftRows = result.left.map((r, i) => ({ cap: r.capacity, total: r.soprano + r.alto, i }));
-  // 오른쪽 6석을 먼저 채운 실제 인원으로 간격을 계산한다.
-  // 양쪽 반줄이 같은 오른쪽 기준과 간격을 공유하고, 어떤 인원도 팔걸이나 의자 밖으로 나가지 않는다.
+  // 좌우에 균등 배분한 인원으로 공통 간격을 계산한다.
+  // 오른쪽 반줄은 항상 바깥쪽 끝에 맞추며, 왼쪽 반줄만 지그재그 이동한다.
   const halfGapCandidates = leftRows.flatMap(r => {
     const span = (r.cap * SEAT + PAD * 2) / 2 - PAD - R * 2 - 4;
     const split = leftSeatSplit(r.total);
-    const offset = leftZigzag && r.i % 2 !== 0 ? 0.5 : 0;
-    return [split.left, split.right].filter(n => n > 0)
-      .map(n => span / Math.max(1, n - 1 + offset));
+    return [
+      { n: split.left, offset: leftZigzag && r.i % 2 !== 0 ? 0.5 : 0 },
+      { n: split.right, offset: 0 }
+    ].filter(h => h.n > 0).map(h => span / Math.max(1, h.n - 1 + h.offset));
   });
   const leftGap = halfGapCandidates.length ? Math.min(...halfGapCandidates) : 0;
   const rightGap = gapOf(result.right.map((r, i) => ({ cap: r.capacity, total: r.bass + r.tenor, i })), 1);
