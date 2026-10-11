@@ -52,11 +52,11 @@ for (const [soprano, alto] of [[26,14], [29,17], [32,17], [33,17], [34,17], [0,0
       if (!half.length) continue;
       for (let k=1; k<half.length; k++) assert.ok(Math.abs(half[k].x-half[k-1].x-gap)<1e-8, '양쪽 반줄 공통 간격');
       if (soprano + alto < 50) {
-        if (side === 'left' && i % 2 === 0) assert.ok(Math.abs(half.at(-1).x-307)<1e-8, '왼쪽 홀수 줄은 중앙 경계에 붙음');
-        if (side === 'right' && i % 2 === 1) assert.ok(Math.abs(half[0].x-345)<1e-8, '오른쪽 짝수 줄은 중앙 경계에 붙음');
+        if (side === 'left' && i % 2 === 1) assert.ok(Math.abs(half.at(-1).x-307)<1e-8, '왼쪽 짝수 줄은 중앙 경계에 붙음');
+        if (side === 'right' && i % 2 === 0) assert.ok(Math.abs(half[0].x-345)<1e-8, '오른쪽 홀수 줄은 중앙 경계에 붙음');
         if (gap !== null) {
           const offset=side==='left' ? 307-half.at(-1).x : half[0].x-345;
-          const shifted=side==='left' ? i%2===1 : i%2===0;
+          const shifted=side==='left' ? i%2===0 : i%2===1;
           assert.ok(Math.abs(offset-(shifted?gap/2:0))<1e-8, `${side} ${i+1}줄 반 칸 지그재그`);
         }
       } else {
