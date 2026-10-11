@@ -344,6 +344,7 @@ function drawChartFrame(ctx) {
   ctx.fillStyle = "#835c22";
   // 금색 띠의 반복무늬는 좌석·글자 바깥 여백에만 둔다.
   for (let x = 70; x < CHART_W - 50; x += 70) {
+    if (Math.abs(x - CHART_W / 2) < 85) continue; // 중앙 장식을 위한 공간
     diamond(x, 10, 3.4); diamond(x, CHART_H - 10, 3.4);
   }
   for (let y = 70; y < CHART_H - 50; y += 70) {
@@ -359,13 +360,49 @@ function drawChartFrame(ctx) {
     ctx.moveTo(...point(6, 25));
     ctx.bezierCurveTo(...point(22, 25), ...point(26, 12), ...point(18, 11));
     ctx.bezierCurveTo(...point(9, 10), ...point(7, 19), ...point(17, 19));
+    ctx.moveTo(...point(9, 36));
+    ctx.bezierCurveTo(...point(24, 38), ...point(39, 27), ...point(36, 17));
+    ctx.bezierCurveTo(...point(34, 9), ...point(25, 8), ...point(23, 15));
+    ctx.bezierCurveTo(...point(21, 23), ...point(33, 26), ...point(36, 17));
     ctx.stroke();
     diamond(...point(22, 22), 4);
+    ctx.fillStyle = "#c89b45";
+    ctx.beginPath(); ctx.moveTo(...point(11, 35));
+    ctx.bezierCurveTo(...point(12, 24), ...point(21, 27), ...point(25, 23));
+    ctx.bezierCurveTo(...point(24, 35), ...point(18, 38), ...point(11, 35));
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(...point(35, 11));
+    ctx.bezierCurveTo(...point(24, 12), ...point(27, 21), ...point(23, 25));
+    ctx.bezierCurveTo(...point(35, 24), ...point(38, 18), ...point(35, 11));
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#835c22";
   };
   ctx.strokeStyle = "#9f752e";
   ctx.lineWidth = 2.1;
   corner(12, 12, 1, 1); corner(CHART_W - 12, 12, -1, 1);
   corner(12, CHART_H - 12, 1, -1); corner(CHART_W - 12, CHART_H - 12, -1, -1);
+  // 상하 중앙의 대칭 덩굴 장식은 배치도와 범례가 없는 여백에 놓는다.
+  const centerpiece = (y, dy) => {
+    const x = CHART_W / 2;
+    ctx.strokeStyle = "#9f752e";
+    ctx.lineWidth = 2.2;
+    for (const side of [-1, 1]) {
+      const point = (a, b) => [x + a * side, y + b * dy];
+      ctx.beginPath(); ctx.moveTo(...point(72, 0));
+      ctx.bezierCurveTo(...point(56, 13), ...point(28, 10), ...point(9, 18));
+      ctx.bezierCurveTo(...point(25, 18), ...point(41, 27), ...point(50, 16));
+      ctx.bezierCurveTo(...point(56, 11), ...point(53, 4), ...point(44, 8));
+      ctx.stroke();
+      ctx.fillStyle = "#c89b45";
+      ctx.beginPath(); ctx.moveTo(...point(24, 12));
+      ctx.bezierCurveTo(...point(29, 2), ...point(41, 5), ...point(47, 2));
+      ctx.bezierCurveTo(...point(43, 13), ...point(32, 17), ...point(24, 12));
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = "#9f752e"; diamond(x, y + 18 * dy, 6);
+    ctx.fillStyle = "#f3d990"; diamond(x, y + 18 * dy, 2.6);
+  };
+  centerpiece(10, 1); centerpiece(CHART_H - 10, -1);
   ctx.restore();
 }
 
