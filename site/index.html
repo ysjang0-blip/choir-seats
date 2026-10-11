@@ -38,7 +38,7 @@
     box-shadow: 0 16px 40px rgba(105, 81, 45, 0.12), 0 3px 10px rgba(105, 81, 45, 0.05);
   }
   #chartWrap:empty { display: none; }
-  #chartWrap img { display: block; width: 100%; height: auto; background: #fff; border-radius: 10px; color-scheme: only light; }
+  #chartWrap img { display: block; width: 100%; height: auto; background: #fff; color-scheme: only light; }
   .note { font-size: 12px; color: #6b6356; text-align: center; }
   #kakaoBanner { background: #fff8d6; border: 1px solid #e6d375; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
   #kakaoBanner p { margin: 0 0 10px; font-size: 14px; color: #6b5a12; line-height: 1.5; }
@@ -319,14 +319,20 @@ function loadChartImage(href) {
   return chartImages.get(href);
 }
 
-// 종이톤 배치도 가장자리에 얇은 금색 액자와 작은 장식무늬를 그린다.
+// 휴대폰에서도 보이도록 금색 띠에 밝고 어두운 선과 장식무늬를 더한다.
 function drawChartFrame(ctx) {
   ctx.save();
-  ctx.strokeStyle = "#b18a47";
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "#c89b45";
+  ctx.lineWidth = 12;
   ctx.strokeRect(10, 10, CHART_W - 20, CHART_H - 20);
-  ctx.strokeStyle = "#dcc393";
-  ctx.lineWidth = 0.7;
+  ctx.strokeStyle = "#835c22";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(3.5, 3.5, CHART_W - 7, CHART_H - 7);
+  ctx.strokeStyle = "#f3d990";
+  ctx.lineWidth = 2.2;
+  ctx.strokeRect(10, 10, CHART_W - 20, CHART_H - 20);
+  ctx.strokeStyle = "#9f752e";
+  ctx.lineWidth = 1.8;
   ctx.strokeRect(18, 18, CHART_W - 36, CHART_H - 36);
 
   const diamond = (x, y, size) => {
@@ -335,16 +341,16 @@ function drawChartFrame(ctx) {
     ctx.lineTo(x, y + size); ctx.lineTo(x - size, y);
     ctx.closePath(); ctx.fill();
   };
-  ctx.fillStyle = "#bd9a5a";
-  // 두 금선 사이의 반복무늬는 좌석·글자 바깥 여백에만 둔다.
+  ctx.fillStyle = "#835c22";
+  // 금색 띠의 반복무늬는 좌석·글자 바깥 여백에만 둔다.
   for (let x = 70; x < CHART_W - 50; x += 70) {
-    diamond(x, 14, 1.8); diamond(x, CHART_H - 14, 1.8);
+    diamond(x, 10, 3.4); diamond(x, CHART_H - 10, 3.4);
   }
   for (let y = 70; y < CHART_H - 50; y += 70) {
-    diamond(14, y, 1.8); diamond(CHART_W - 14, y, 1.8);
+    diamond(10, y, 3.4); diamond(CHART_W - 10, y, 3.4);
   }
   const corner = (x, y, dx, dy) => {
-    const point = (a, b) => [x + a * dx, y + b * dy];
+    const point = (a, b) => [x + a * dx * 1.3, y + b * dy * 1.3];
     ctx.beginPath();
     ctx.moveTo(...point(0, 38));
     ctx.bezierCurveTo(...point(0, 16), ...point(16, 0), ...point(38, 0));
@@ -354,10 +360,10 @@ function drawChartFrame(ctx) {
     ctx.bezierCurveTo(...point(22, 25), ...point(26, 12), ...point(18, 11));
     ctx.bezierCurveTo(...point(9, 10), ...point(7, 19), ...point(17, 19));
     ctx.stroke();
-    diamond(...point(22, 22), 2.4);
+    diamond(...point(22, 22), 4);
   };
-  ctx.strokeStyle = "#b18a47";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#9f752e";
+  ctx.lineWidth = 2.1;
   corner(12, 12, 1, 1); corner(CHART_W - 12, 12, -1, 1);
   corner(12, CHART_H - 12, 1, -1); corner(CHART_W - 12, CHART_H - 12, -1, -1);
   ctx.restore();
