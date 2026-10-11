@@ -68,7 +68,7 @@ module.exports = (async () => {
     assert.equal(canvas.width, 2740);
     assert.equal(canvas.height, 1930);
     assert.deepEqual(canvas.scale, [2,2]);
-    assert.deepEqual(canvas.commands[0], {name:'fillRect',args:[0,0,1370,965],color:'#ffffff'});
+    assert.deepEqual(canvas.commands[0], {name:'fillRect',args:[0,0,1370,965],color:'#fffaf4'});
     const labels = canvas.commands.filter(command => command.name === 'fillText');
     assert.ok(labels.some(command => command.color === '#168DDF'), '소프라노 원래 파랑');
     assert.ok(labels.some(command => command.color === '#D66A12'), '알토 원래 오렌지');

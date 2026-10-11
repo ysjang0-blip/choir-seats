@@ -18,7 +18,7 @@ for (const [soprano, alto] of [[26,14], [29,17], [32,17], [33,17], [34,17], [0,0
   const svg = render(counts);
   const seats = images(svg);
   assert.match(svg, /width="1370" height="965"/);
-  assert.match(svg, /width="1370" height="965" fill="#ffffff"/);
+  assert.match(svg, /width="1370" height="965" fill="#fffaf4"/);
   assert.equal(seats.filter(s => s.part === 'soprano').length, soprano);
   assert.equal(seats.filter(s => s.part === 'alto').length, alto);
   assert.equal(seats.filter(s => s.part === 'bass').length, 11);
