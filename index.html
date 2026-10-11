@@ -110,7 +110,7 @@ function seatEmoji(cx, cy, part, size = 32) {
 // 한 줄: 왼쪽부터 leftN명은 leftPart 색, 나머지는 rightPart 색.
 // 왼쪽 블록은 팔걸이 양쪽 인원을 균등하게 나눈다(차이는 최대 1명).
 // 양쪽 반줄은 팔걸이를 기준으로 번갈아 반 칸 이동해 지그재그를 유지한다.
-// 왼쪽은 1·3·5줄, 오른쪽은 2·4줄이 팔걸이에 붙는다.
+// 오른쪽은 1·3·5줄, 왼쪽은 2·4줄이 팔걸이에 붙는다.
 // 50명 이상은 지그재그 이동 없이 정렬한다.
 // blockGap은 지그재그일 때는 지그재그 간격, 일렬일 때는 일렬 간격이다.
 // 인원 숫자는 의자 바로 아래(앞뒤로 벌려 놓은 빈 공간)에 쓴다.
@@ -145,7 +145,7 @@ function rowSvg(x, y, cap, leftPart, leftN, rightPart, rightN, rowIndex, zigzag,
       // 인원이 다른 줄끼리 지그재그가 어긋나므로 같은 격자 위에 놓는다.
       const gap = blockGap;
       // flushParity와 홀짝이 같은 줄이 anchor 쪽 끝에 바짝 붙고, 나머지는 반 칸 안쪽
-      // (왼쪽 블록: 1·3·5줄이 오른쪽 끝, 오른쪽 블록: 2·4줄이 오른쪽 끝)
+      // 베이스·테너 블록은 2·4줄이 오른쪽 끝에 붙는다.
       const offset = rowIndex % 2 === flushParity ? 0 : gap / 2;
       for (let k = 0; k < total; k++) {
         if (anchor === "right") xs.push(x + w - PAD - R - offset - (total - 1 - k) * gap);
@@ -201,14 +201,15 @@ function renderChart(result) {
     return cands.length ? Math.min(...cands) : 0;
   };
   const leftRows = result.left.map((r, i) => ({ cap: r.capacity, total: r.soprano + r.alto, i }));
+  const leftFlushParity = 1; // 여성 파트: 왼쪽은 2·4줄, 오른쪽은 1·3·5줄이 중앙에 붙는다.
   // 좌우에 균등 배분한 인원으로 공통 간격을 계산한다.
   // 양쪽 반줄의 지그재그 이동까지 포함해 공통 간격을 계산한다.
   const halfGapCandidates = leftRows.flatMap(r => {
     const span = (r.cap * SEAT + PAD * 2) / 2 - PAD - R * 2 - 4;
     const split = leftSeatSplit(r.total);
     return [
-      { n: split.left, offset: leftZigzag && r.i % 2 !== 0 ? 0.5 : 0 },
-      { n: split.right, offset: leftZigzag && r.i % 2 === 0 ? 0.5 : 0 }
+      { n: split.left, offset: leftZigzag && r.i % 2 !== leftFlushParity ? 0.5 : 0 },
+      { n: split.right, offset: leftZigzag && r.i % 2 === leftFlushParity ? 0.5 : 0 }
     ].filter(h => h.n > 0).map(h => span / Math.max(1, h.n - 1 + h.offset));
   });
   const leftGap = halfGapCandidates.length ? Math.min(...halfGapCandidates) : 0;
@@ -219,7 +220,7 @@ function renderChart(result) {
   // 맨 앞줄(1줄)이 그림 아래쪽: 지휘자(맨 앞)가 바라본 모습 그대로
   result.left.forEach((row, i) => {
     const y = TOP + (4 - i) * (BENCH_H + ROW_GAP);
-    s += rowSvg(LEFT_X, y, row.capacity, "soprano", row.soprano, "alto", row.alto, i, leftZigzag, "right", leftGap, 0, true);
+    s += rowSvg(LEFT_X, y, row.capacity, "soprano", row.soprano, "alto", row.alto, i, leftZigzag, "right", leftGap, leftFlushParity, true);
   });
   // 오른쪽 블록: 오른쪽 끝을 수직으로 맞추고(90도), 의자가 뒤로 갈수록 길어져 왼쪽이 사선인 사다리꼴.
   // 사람은 오른쪽 끝 기준으로 앉히되 2·4줄이 끝에 바짝 붙는다.
