@@ -58,18 +58,20 @@ test("기본 배치: 인원 합계와 줄 정원 준수", () => {
   assertEqual(partSum(r.right, "bass"), 10);
   rowTotalsOk(r);
 });
-test("소프라노29+알토17: 각 파트는 앞줄부터 균등 배분", () => {
-  const r = assignSeats({ soprano: 29, alto: 17, tenor: 0, bass: 0 });
-  assertTrue(r.ok, "ok여야 함");
-  assertEqual(r.left.map(x => x.soprano), [6, 6, 6, 6, 5], "소프라노");
-  assertEqual(r.left.map(x => x.alto), [4, 4, 3, 3, 3], "알토");
-});
-test("소프라노29+알토18: 각 파트는 앞줄 인원 우선", () => {
-  const r = assignSeats({ soprano: 29, alto: 18, tenor: 0, bass: 0 });
-  assertTrue(r.ok, "ok여야 함");
-  assertEqual(r.left.map(x => x.soprano), [6, 6, 6, 6, 5], "소프라노");
-  assertEqual(r.left.map(x => x.alto), [4, 4, 4, 3, 3], "알토");
-});
+for (const [soprano, alto, expected] of [
+  [27, 17, [9, 9, 9, 9, 8]],
+  [29, 17, [10, 9, 9, 9, 9]],
+  [29, 18, [10, 10, 9, 9, 9]],
+]) {
+  test(`소프라노${soprano}+알토${alto}: 줄별 합계를 앞줄부터 균등 배분`, () => {
+    const r = assignSeats({ soprano, alto, tenor: 0, bass: 0 });
+    assertTrue(r.ok);
+    assertEqual(r.left.map(x => x.soprano + x.alto), expected);
+    assertEqual(partSum(r.left, "soprano"), soprano);
+    assertEqual(partSum(r.left, "alto"), alto);
+    rowTotalsOk(r);
+  });
+}
 test("테너11+베이스12: 1줄은 테너2+베이스2", () => {
   const r = assignSeats({ soprano: 0, alto: 0, tenor: 11, bass: 12 });
   assertTrue(r.ok, "ok여야 함");
@@ -86,7 +88,7 @@ test("소프라노20+알토18: 뒷줄 인원이 앞줄보다 많지 않음", () 
   assertEqual(r.left.map(x => x.alto), [4, 4, 4, 3, 3]);
   rowTotalsOk(r);
 });
-test("왼쪽 모든 입력 조합: 합계·정원 준수, 여유가 있으면 앞줄 우선", () => {
+test("왼쪽 모든 입력 조합: 파트 총원·정원 준수, 줄별 합계 균등 배분", () => {
   for (let soprano = 0; soprano <= 60; soprano++) {
     for (let alto = 0; alto <= 60 - soprano; alto++) {
       const r = assignSeats({ soprano, alto, tenor: 0, bass: 0 });
@@ -94,11 +96,8 @@ test("왼쪽 모든 입력 조합: 합계·정원 준수, 여유가 있으면 �
       assertEqual(partSum(r.left, "soprano"), soprano);
       assertEqual(partSum(r.left, "alto"), alto);
       rowTotalsOk(r);
-      if (Math.ceil(soprano / 5) + Math.ceil(alto / 5) <= 12) {
-        for (const part of ["soprano", "alto"]) {
-          r.left.slice(1).forEach((row, i) => assertTrue(row[part] <= r.left[i][part], `${soprano}/${alto} ${part}`));
-        }
-      }
+      assertEqual(r.left.map(row => row.soprano + row.alto),
+        distributeToRows(soprano + alto, LEFT_CAPS));
     }
   }
 });
